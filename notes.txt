@@ -1,0 +1,12 @@
+compile
+- hmr script is generated with module->{hash, parents} map
+- added as an entry
+- all other entries lose their entry status and get required by the hmr script
+
+first run
+- hmr script runs
+- defines global._hmr
+- requires all original entries
+
+reload
+- hmr script runs
