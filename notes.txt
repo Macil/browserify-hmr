@@ -1,12 +1,42 @@
-compile
-- hmr script is generated with module->{hash, parents} map
-- added as an entry
+# compile
+- hmr script is generated with moduleFilename->{index, hash, parents} map (`moduleMeta`).
+  this object should be treated as immutable and not changed.
+- hmr script added as an entry
 - all other entries lose their entry status and get required by the hmr script
 
-first run
+# first run
 - hmr script runs
-- defines global._hmr
+- `moduleIndexesToNames` is made as a reverse-lookup table to `moduleMeta`
+- `runtimeModuleInfo` is made to track latest `moduleMeta` info and other runtime stuff
+- defines global._hmr which defines the module.hot api in all modules
 - requires all original entries
 
-reload
-- hmr script runs
+# Reload
+check
+- reloads the script, re-runs it
+- new hmr script sees that global._hmr already exists
+- global._hmr.newLoad is set to the new moduleDefs, moduleMeta, moduleIndexesToNames objects
+- builds a list of outdated modules:
+  - get the modules that have new hashes. Include modules that have been added or removed.
+  - get the modules that are outdated because they are un-accepting/declining parents of outdated modules:
+    - for each outdated module
+      - skip if module accepts or declines self, or isn't currently loaded
+      - for each parent
+        - if parent does not accept or decline module, add to end of outdated module list
+- calls the user's callback with the list of outdated modules
+apply
+- builds a list of outdated modules, same steps as in check
+- builds a list of accepted updates
+  - TODO
+- if ignoreUnaccepted is false and length of accepted updates list != length of
+  outdated modules list, then abort
+- prepare for execution
+  - execute all accepted modules' dispose callbacks, save data to module.hot.data.
+    try-catch this and fail apply if error.
+  - remove all accepted modules' exports
+  - remove all accepted modules from parent lists
+  - update runtimeModuleInfo and moduleDefs to match new
+- for each accepted module, if it self-accepted, require it, otherwise call its
+  parents' accepters.
+  try-catch this. If module accepted self, give it the error and continue,
+  otherwise keep the error, continue, and deliver it to callback at end.

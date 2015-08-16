@@ -29,11 +29,13 @@
       var moduleMeta = {
         "/Users/chris/Coding/browserify-hmr/example/a.js": {
           index: 2,
-          hash: 10
+          hash: 10,
+          parents: ["/Users/chris/Coding/browserify-hmr/example/index.js"]
         },
         "/Users/chris/Coding/browserify-hmr/example/index.js": {
           index: 3,
-          hash: 20
+          hash: 20,
+          parents: []
         }
       };
       var originalEntries = [
@@ -44,22 +46,43 @@
 
       var name, i, len;
 
-      var moduleIndexesToIds = {};
+      var moduleIndexesToNames = {};
       for (name in moduleMeta) {
         if (Object.prototype.hasOwnProperty.call(moduleMeta, name)) {
-          moduleIndexesToIds[moduleMeta[name].index] = name;
+          moduleIndexesToNames[moduleMeta[name].index] = name;
         }
       }
 
       if (!global._hmr) {
-        var moduleInfo = {};
+        var StrSet = function StrSet() {
+          this._map = {};
+        };
+        StrSet.prototype.add = function(value) {
+          this._map[value] = true;
+        };
+        StrSet.prototype.has = function(value) {
+          return Object.prototype.hasOwnProperty.call(this._map, value);
+        };
+        StrSet.prototype.del = function(value) {
+          delete this._map[value];
+        };
+        StrSet.prototype.forEach = function(cb) {
+          for (var value in this._map) {
+            if (this.has(value)) {
+              cb(value);
+            }
+          }
+        };
+
+        var runtimeModuleInfo = {};
         var createInfoEntry = function(name) {
-          moduleInfo[name] = {
+          runtimeModuleInfo[name] = {
             index: moduleMeta[name].index,
             hash: moduleMeta[name].hash,
-            parents: {}, // later set to object where keys are names, values are true
+            parents: moduleMeta[name].parents,
             module: null,
             accepters: [],
+            selfAccepters: [],
             decliners: [],
             accepting: [],
             declining: [],
@@ -71,33 +94,60 @@
             createInfoEntry(name);
           }
         }
-        var setupParents = function() {
-          for (var name in moduleInfo) {
-            if (Object.prototype.hasOwnProperty.call(moduleInfo, name)) {
-              for (i=0, len=moduleDefs[moduleInfo[name].index][1].length; i<len; i++) {
-                moduleInfo[ moduleIndexesToIds[moduleDefs[moduleInfo[name].index][1][i]] ].parents[name] = true;
-              }
-            }
+
+        var fileReloaders = {
+          fs: function(cb) {
+            var fs = require('fs');
+            fs.readFile(global._hmr.updateUrl, 'utf8', cb);
           }
         };
-        setupParents();
 
-        var clearParents = function() {
-          for (var name in moduleInfo) {
-            if (Object.prototype.hasOwnProperty.call(moduleInfo, name)) {
-              moduleInfo[name].parents = {};
-            }
+        var reloadAndRunScript = function(cb) {
+          if (!Object.prototype.hasOwnProperty.call(fileReloaders, global._hmr.updateMode)) {
+            cb(new Error("updateMode "+global._hmr.updateMode+" not implemented"));
+            return;
           }
+          var reloader = fileReloaders[global._hmr.updateMode];
+          reloader(function(err, data) {
+            if (err) {
+              cb(err);
+              return;
+            }
+            global._hmr.newLoad = null;
+            try {
+              //jshint evil:true
+              new Function('require', '__filename', '__dirname', data)(require, __filename, __dirname);
+              // running the file sets _hmr.newLoad
+            } catch (err2) {
+              global._hmr.newLoad = null;
+              cb(err2);
+              return;
+            }
+            if (!global._hmr.newLoad) {
+              cb(new Error("Reloaded script did not set hot module reload data"));
+              return;
+            }
+            cb(null);
+          });
         };
 
         var getOutdatedModules = function() {
+          // get all modules that have a different hash, including new and removed modules
           var outdated = [];
-          for (var name in moduleInfo) {
-            if (Object.prototype.hasOwnProperty.call(moduleInfo, name)) {
+          var name;
+          for (name in runtimeModuleInfo) {
+            if (Object.prototype.hasOwnProperty.call(runtimeModuleInfo, name)) {
               if (
-                !global._hmr.newLoad.moduleMeta[name] ||
-                moduleInfo[name].hash !== global._hmr.newLoad.moduleMeta[name].hash
+                !Object.prototype.hasOwnProperty.call(global._hmr.newLoad.moduleMeta, name) ||
+                runtimeModuleInfo[name].hash !== global._hmr.newLoad.moduleMeta[name].hash
               ) {
+                outdated.push(name);
+              }
+            }
+          }
+          for (name in global._hmr.newLoad.moduleMeta) {
+            if (Object.prototype.hasOwnProperty.call(global._hmr.newLoad.moduleMeta, name)) {
+              if (!Object.prototype.hasOwnProperty.call(runtimeModuleInfo, name)) {
                 outdated.push(name);
               }
             }
@@ -105,15 +155,10 @@
           return outdated;
         };
 
-        var isUpdateAccepted = function(name) {
-          // TODO
-          return true;
-        };
-
         global._hmr = {
           updateUrl: updateUrl,
           updateMode: updateMode,
-          moduleInfo: moduleInfo,
+          runtimeModuleInfo: runtimeModuleInfo,
 
           status: "idle",
           setStatus: function(status) {
@@ -127,18 +172,18 @@
           updateHandlers: [],
 
           // during a reload this is set to an object with moduleDefs,
-          // moduleMeta, and moduleIndexesToIds properties
+          // moduleMeta, and moduleIndexesToNames properties
           newLoad: null,
 
           initModule: function(id, module) {
-            moduleInfo[id].module = module;
+            runtimeModuleInfo[id].module = module;
             module.hot = {
               accept: function(deps, cb) {
                 if (!cb && (!deps || typeof deps === 'function')) { // self
                   cb = deps;
                   deps = null;
-                  moduleInfo[id].accepters.push(id);
-                  moduleInfo[id].accepting.push(id);
+                  runtimeModuleInfo[id].accepters.push(id);
+                  runtimeModuleInfo[id].accepting.push(id);
                   // TODO call cb on relevant errors
                 } else {
                   if (typeof deps === 'string') {
@@ -147,16 +192,16 @@
                   var depIds = new Array(deps.length);
                   var i, depsLen=deps.length;
                   for (i=0; i<depsLen; i++) {
-                    var depIndex = moduleDefs[moduleInfo[id].index][1][deps[i]];
-                    if (depIndex === undefined || !Object.prototype.hasOwnProperty.call(moduleIndexesToIds, depIndex)) {
+                    var depIndex = moduleDefs[runtimeModuleInfo[id].index][1][deps[i]];
+                    if (depIndex === undefined || !Object.prototype.hasOwnProperty.call(moduleIndexesToNames, depIndex)) {
                       throw new Error("File does not use dependency: "+deps[i]);
                     }
-                    depIds[i] = moduleIndexesToIds[depIndex];
+                    depIds[i] = moduleIndexesToNames[depIndex];
                   }
                   deps = null;
                   for (i=0; i<depsLen; i++) {
-                    moduleInfo[depIds[i]].accepters.push(id);
-                    moduleInfo[id].accepting.push(depIds[i]);
+                    runtimeModuleInfo[depIds[i]].accepters.push(id);
+                    runtimeModuleInfo[id].accepting.push(depIds[i]);
                   }
                   if (cb) {
                     global._hmr.updateHandlers.push(function(err, updatedIds) {
@@ -177,20 +222,20 @@
               },
               decline: function(deps) {
                 if (!deps) { // self
-                  moduleInfo[id].decliners.push(id);
-                  moduleInfo[id].declining.push(id);
+                  runtimeModuleInfo[id].decliners.push(id);
+                  runtimeModuleInfo[id].declining.push(id);
                 } else {
                   if (typeof deps === 'string') {
                     deps = [deps];
                   }
                   for (var i=0, depsLen=deps.length; i<depsLen; i++) {
-                    var depIndex = moduleDefs[moduleInfo[id].index][1][deps[i]];
-                    if (depIndex === undefined || !Object.prototype.hasOwnProperty.call(moduleIndexesToIds, depIndex)) {
+                    var depIndex = moduleDefs[runtimeModuleInfo[id].index][1][deps[i]];
+                    if (depIndex === undefined || !Object.prototype.hasOwnProperty.call(moduleIndexesToNames, depIndex)) {
                       throw new Error("File does not use dependency: "+deps[i]);
                     }
-                    var depId = moduleIndexesToIds[depIndex];
-                    moduleInfo[depId].decliners.push(id);
-                    moduleInfo[id].declining.push(depId);
+                    var depId = moduleIndexesToNames[depIndex];
+                    runtimeModuleInfo[depId].decliners.push(id);
+                    runtimeModuleInfo[id].declining.push(depId);
                   }
                 }
               },
@@ -198,12 +243,12 @@
                 return this.addDisposeHandler(cb);
               },
               addDisposeHandler: function(cb) {
-                moduleInfo[id].disposeHandlers.push(cb);
+                runtimeModuleInfo[id].disposeHandlers.push(cb);
               },
               removeDisposeHandler: function(cb) {
-                var ix = moduleInfo[id].disposeHandlers.indexOf(cb);
+                var ix = runtimeModuleInfo[id].disposeHandlers.indexOf(cb);
                 if (ix !== -1) {
-                  moduleInfo[id].disposeHandlers.splice(ix, 1);
+                  runtimeModuleInfo[id].disposeHandlers.splice(ix, 1);
                 }
               },
 
@@ -217,43 +262,30 @@
                   throw new Error("module.hot.check callback parameter required");
                 }
                 if (this.status() !== 'idle') {
-                  return cb(new Error("module.hot.check can only be called while status is idle"));
+                  cb(new Error("module.hot.check can only be called while status is idle"));
+                  return;
                 }
 
-                if (global._hmr.updateMode === 'fs') {
-                  global._hmr.setStatus('check');
-                  var fs = require('fs');
-                  fs.readFile(global._hmr.updateUrl, 'utf8', function(err, data) {
-                    if (err) {
-                      global._hmr.setStatus('idle');
-                      return cb(err);
-                    }
-                    global._hmr.newLoad = null;
-                    try {
-                      //jshint evil:true
-                      new Function('require', '__filename', '__dirname', data)(require, __filename, __dirname);
-                      // running the file sets _hmr.newLoad
-                    } catch (err2) {
-                      global._hmr.newLoad = null;
-                      global._hmr.setStatus('idle');
-                      return cb(err2);
-                    }
-                    var outdatedModules = getOutdatedModules();
-                    if (outdatedModules.length === 0) {
-                      global._hmr.setStatus('idle');
-                      cb(null);
+                global._hmr.setStatus('check');
+                reloadAndRunScript(function(err) {
+                  if (err) {
+                    global._hmr.setStatus('idle');
+                    cb(err);
+                    return;
+                  }
+                  var outdatedModules = getOutdatedModules();
+                  if (outdatedModules.length === 0) {
+                    global._hmr.setStatus('idle');
+                    cb(null);
+                  } else {
+                    global._hmr.setStatus('ready');
+                    if (autoApply) {
+                      module.hot.apply(autoApply, cb);
                     } else {
-                      global._hmr.setStatus('ready');
-                      if (autoApply) {
-                        module.hot.apply(autoApply, cb);
-                      } else {
-                        cb(null, outdatedModules);
-                      }
+                      cb(null, outdatedModules);
                     }
-                  });
-                } else {
-                  return cb(new Error("updateMode "+global._hmr.updateMode+" implemented"));
-                }
+                  }
+                });
               },
               apply: function(options, cb) {
                 if (typeof options === 'function') {
@@ -276,7 +308,8 @@
                   } else {
                     if (!ignoreUnaccepted) {
                       global._hmr.setStatus('idle');
-                      return cb(new Error("Module update not accepted: "+outdatedModules[i]));
+                      cb(new Error("Module update not accepted: "+outdatedModules[i]));
+                      return;
                     }
                   }
                 }
@@ -299,19 +332,16 @@
                 for (i=0, len=modulesToUpdate.length; i<len; i++) {
                   // Remove module accepters+decliners of them all first
                   // update moduleDefs
-                  moduleInfo[modulesToUpdate[i]].hash =
+                  runtimeModuleInfo[modulesToUpdate[i]].hash =
                     moduleMeta[modulesToUpdate[i]].hash =
                     global._hmr.newLoad.moduleMeta[modulesToUpdate[i]].hash;
                   reloadedIndex = global._hmr.newLoad.moduleMeta[modulesToUpdate[i]].index;
-                  translatedReqs = moduleDefs[moduleInfo[modulesToUpdate[i]].index][1]; // []; TODO
-                  moduleDefs[moduleInfo[modulesToUpdate[i]].index] = [
+                  translatedReqs = moduleDefs[runtimeModuleInfo[modulesToUpdate[i]].index][1]; // []; TODO
+                  moduleDefs[runtimeModuleInfo[modulesToUpdate[i]].index] = [
                     global._hmr.newLoad.moduleDefs,
                     translatedReqs
                   ];
                 }
-                // TODO efficiently update only the parents of changed modules
-                clearParents();
-                setupParents();
                 for (i=0, len=modulesToUpdate.length; i<len; i++) {
                   // call _hmr.updateHandlers
                 }
@@ -335,7 +365,7 @@
           }
         };
         for (i=0, len=originalEntries.length; i<len; i++) {
-          require(moduleInfo[originalEntries[i]].index);
+          require(runtimeModuleInfo[originalEntries[i]].index);
         }
       } else { // We're in a reload!
         console.log('in a reload');
@@ -343,7 +373,7 @@
         global._hmr.newLoad = {
           moduleDefs: moduleDefs,
           moduleMeta: moduleMeta,
-          moduleIndexesToIds: moduleIndexesToIds
+          moduleIndexesToNames: moduleIndexesToNames
         };
       }
     }).call(
@@ -380,8 +410,11 @@
 
     if (module.hot && global.runCount === 1) {
       setTimeout(function() {
-        module.hot.check(true, function(err, outdatedModules) {
+        module.hot.check(function(err, outdatedModules) {
           console.log('check callback', err, outdatedModules);
+          // module.hot.apply(function(err, outdatedModules) {
+          //   console.log('apply callback', err, outdatedModules);
+          // });
         });
       }, 1000);
     }
