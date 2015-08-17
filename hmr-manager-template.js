@@ -252,16 +252,18 @@
       for (var i=0; i<outdated.length; i++) {
         name = outdated[i];
         //jshint -W083
-        runtimeModuleInfo[name].parents.forEach(function(parentName) {
-          if (
-            runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
-            !runtimeModuleInfo[name].accepters.has(parentName) &&
-            !runtimeModuleInfo[name].decliners.has(parentName) &&
-            outdated.indexOf(parentName) === -1
-          ) {
-            outdated.push(parentName);
-          }
-        });
+        if (has(runtimeModuleInfo, name)) {
+          runtimeModuleInfo[name].parents.forEach(function(parentName) {
+            if (
+              runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
+              !runtimeModuleInfo[name].accepters.has(parentName) &&
+              !runtimeModuleInfo[name].decliners.has(parentName) &&
+              outdated.indexOf(parentName) === -1
+            ) {
+              outdated.push(parentName);
+            }
+          });
+        }
       }
       return outdated;
     };
@@ -430,15 +432,17 @@
             var an;
             for (i=0, len=acceptedUpdates.length; i<len; i++) {
               an = acceptedUpdates[i];
-              for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
-                try {
-                  var data = {};
-                  runtimeModuleInfo[an].disposeHandlers[j].call(null, data);
-                  runtimeModuleInfo[an].disposeData = data;
-                } catch(e) {
-                  global._hmr.setStatus('idle');
-                  cb(e || new Error("Unknown dispose callback error"));
-                  return;
+              if (has(runtimeModuleInfo, an)) {
+                for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
+                  try {
+                    var data = {};
+                    runtimeModuleInfo[an].disposeHandlers[j].call(null, data);
+                    runtimeModuleInfo[an].disposeData = data;
+                  } catch(e) {
+                    global._hmr.setStatus('idle');
+                    cb(e || new Error("Unknown dispose callback error"));
+                    return;
+                  }
                 }
               }
             }
@@ -447,6 +451,7 @@
               an = acceptedUpdates[i];
               //jshint -W083
               if (!has(runtimeModuleInfo, an)) {
+                // new modules
                 runtimeModuleInfo[an] = {
                   index: an,
                   hash: global._hmr.newLoad.moduleMeta[name].hash,
@@ -460,7 +465,13 @@
                   selfAcceptCbs: [],
                   disposeHandlers: []
                 };
+              } else if (!has(global._hmr.newLoad.moduleMeta, an)) {
+                // removed modules
+                delete cachedModules[runtimeModuleInfo[an].index];
+                delete runtimeModuleInfo[an];
+                continue;
               } else {
+                // updated modules
                 runtimeModuleInfo[an].hash = global._hmr.newLoad.moduleMeta[an].hash;
                 runtimeModuleInfo[an].parents = new StrSet(global._hmr.newLoad.moduleMeta[an].parents);
                 runtimeModuleInfo[an].module.exports = {};

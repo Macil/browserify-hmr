@@ -89,4 +89,55 @@ describe('browserify-hmr', function() {
       })
     ]);
   }));
+
+  it('new dependency works', co.wrap(function*() {
+    this.slow();
+    const index = path.join(dir, 'new-index.js');
+    const depA = path.join(dir, 'new-dep-a.js');
+    const depB = path.join(dir, 'new-dep-b.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/new-index.js', index);
+    yield copy('./test/data/new-dep-a1.js', depA);
+    yield copy('./test/data/new-dep-b.js', depB);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/new-dep-a2.js', depA);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
+  it('remove dependency works', co.wrap(function*() {
+    this.slow();
+    const index = path.join(dir, 'remove-index.js');
+    const depA = path.join(dir, 'remove-dep-a.js');
+    const depB = path.join(dir, 'remove-dep-b.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/remove-index.js', index);
+    yield copy('./test/data/remove-dep-a1.js', depA);
+    yield copy('./test/data/remove-dep-b.js', depB);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/remove-dep-a2.js', depA);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
 });
