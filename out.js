@@ -68,6 +68,20 @@
         }
         return output;
       }
+      function filter(array, fn) {
+        var output = [];
+        for (var i=0,len=array.length; i<len; i++) {
+          if (fn(array[i], i, array))
+            output.push(array[i]);
+        }
+        return output;
+      }
+      function forOwn(object, fn) {
+        for (var key in object) {
+          if (has(object, key))
+            fn(object[key], key, object);
+        }
+      }
       function mapValues(object, fn) {
         var output = {};
         for (var key in object) {
@@ -208,6 +222,7 @@
         var getOutdatedModules = function() {
           var outdated = [];
           var name;
+          // add changed and deleted modules
           for (name in runtimeModuleInfo) {
             if (has(runtimeModuleInfo, name)) {
               if (
@@ -218,6 +233,7 @@
               }
             }
           }
+          // add brand new modules
           for (name in global._hmr.newLoad.moduleMeta) {
             if (has(global._hmr.newLoad.moduleMeta, name)) {
               if (!has(runtimeModuleInfo, name)) {
@@ -225,7 +241,23 @@
               }
             }
           }
-          // TODO follow unaccepting parents
+          // add modules that are non-accepting/declining parents of outdated modules.
+          // important: if outdated has new elements added during the loop,
+          // then we iterate over them too.
+          for (var i=0; i<outdated.length; i++) {
+            name = outdated[i];
+            //jshint -W083
+            forEach(runtimeModuleInfo[name].parents, function(parentName) {
+              if (
+                runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
+                !runtimeModuleInfo[name].accepters.has(parentName) &&
+                !runtimeModuleInfo[name].decliners.has(parentName) &&
+                outdated.indexOf(parentName) === -1
+              ) {
+                outdated.push(parentName);
+              }
+            });
+          }
           return outdated;
         };
 
@@ -277,7 +309,7 @@
                   if (cb) {
                     global._hmr.updateHandlers.push({
                       accepter: name,
-                      deps: new StrSet(deps),
+                      deps: depNames,
                       cb: cb
                     });
                   }
@@ -367,16 +399,18 @@
                 var isValueNotInOutdatedModules = function(value) {
                   return outdatedModules.indexOf(value) === -1;
                 };
-                var acceptedUpdates = [];
                 var i, len;
-                for (i=0, len=outdatedModules.length; i<len; i++) {
-                  if (has(runtimeModuleInfo, outdatedModules[i])) {
-                    if (runtimeModuleInfo[outdatedModules[i]].decliners.some(isValueNotInOutdatedModules)) {
-                      continue;
+                var acceptedUpdates = filter(outdatedModules, function(name) {
+                  if (has(runtimeModuleInfo, name)) {
+                    if (
+                      runtimeModuleInfo[name].decliners.some(isValueNotInOutdatedModules) ||
+                      (runtimeModuleInfo[name].accepters.size() === 0 && runtimeModuleInfo[name].selfAcceptCbs.length === 0)
+                    ) {
+                      return false;
                     }
                   }
-                  acceptedUpdates.push(outdatedModules[i]);
-                }
+                  return true;
+                });
                 if (!ignoreUnaccepted && outdatedModules.length !== acceptedUpdates.length) {
                   cb(new Error("Some updates were declined"));
                   return;
@@ -527,7 +561,8 @@
     (function(){
     // original start
 
-    console.log('a');
+    module.exports = {a:123};
+    console.log('a running');
     if (module.hot) {
       module.hot.dispose(function() {
         console.log('disposing a');
@@ -544,18 +579,25 @@
 
     global.runCount = (global.runCount||0) + 1;
     console.log('index start!');
-    require('./a');
+    console.log('exports of a', require('./a'));
     console.log('index end');
 
-    if (module.hot && global.runCount === 1) {
-      setTimeout(function() {
-        module.hot.check(function(err, outdatedModules) {
-          console.log('check callback', err, outdatedModules);
-          module.hot.apply(function(err, outdatedModules) {
-            console.log('apply callback', err, outdatedModules);
+    if (module.hot) {
+      module.hot.accept('./a', function() {
+        console.log('index accepted new a');
+        console.log('exports of a', require('./a'));
+      });
+
+      if (global.runCount === 1) {
+        setTimeout(function() {
+          module.hot.check(function(err, outdatedModules) {
+            console.log('check callback', err, outdatedModules);
+            module.hot.apply(function(err, outdatedModules) {
+              console.log('apply callback', err, outdatedModules);
+            });
           });
-        });
-      }, 1000);
+        }, 1000);
+      }
     }
 
     // original end
