@@ -364,7 +364,7 @@
             reloadAndRunScript(function(err, expectUpdate) {
               if (err || !expectUpdate) {
                 global._hmr.setStatus('idle');
-                cb(err);
+                cb(err, null);
                 return;
               }
               var outdatedModules = getOutdatedModules();
