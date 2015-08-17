@@ -131,6 +131,7 @@
         hash: moduleMeta[name].hash,
         parents: moduleMeta[name].parents,
         module: null,
+        disposeData: null,
         accepters: new StrSet(),
         accepting: new StrSet(),
         decliners: new StrSet(),
@@ -333,6 +334,7 @@
               }
             }
           },
+          data: runtimeModuleInfo[name].disposeData,
           dispose: function(cb) {
             return this.addDisposeHandler(cb);
           },
@@ -421,8 +423,9 @@
               an = acceptedUpdates[i];
               for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
                 try {
-                  runtimeModuleInfo[an].disposeHandlers[j].call(null);
-                  // TODO save return value to module.hot.data
+                  var data = {};
+                  runtimeModuleInfo[an].disposeHandlers[j].call(null, data);
+                  runtimeModuleInfo[an].disposeData = data;
                 } catch(e) {
                   global._hmr.setStatus('idle');
                   cb(e || new Error("Unknown dispose callback error"));
@@ -440,6 +443,7 @@
                   hash: global._hmr.newLoad.moduleMeta[name].hash,
                   parents: global._hmr.newLoad.moduleMeta[name].parents,
                   module: null,
+                  disposeData: null,
                   accepters: new StrSet(),
                   accepting: new StrSet(),
                   decliners: new StrSet(),

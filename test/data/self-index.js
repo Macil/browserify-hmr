@@ -11,7 +11,7 @@ function doCheck() {
     }
     if (outdated) {
       module.hot.apply(function(err, outdatedModules) {
-        console.error('Should not happen');
+        console.error('Should not happen', err);
         process.exit(1);
       });
     } else {
