@@ -542,7 +542,7 @@
       }
     };
     for (i=0, len=originalEntries.length; i<len; i++) {
-      require(runtimeModuleInfo[originalEntries[i]].index);
+      require(originalEntries[i]);
     }
   } else { // We're in a reload!
     global._hmr.newLoad = {

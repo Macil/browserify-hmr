@@ -11,9 +11,16 @@
     "rsvp": "^3.0.21",
     "through2": "^2.0.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "babel": "^5.8.21",
+    "browserify": "^11.0.1",
+    "co": "^4.6.0",
+    "fs-extra": "^0.23.1",
+    "mocha": "^2.2.5",
+    "rimraf": "^2.4.2"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "keywords": [
     "browserify",

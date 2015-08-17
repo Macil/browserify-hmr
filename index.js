@@ -17,7 +17,7 @@ function hash(str) {
 
 var readManagerTemplate = _.once(function() {
   return new RSVP.Promise(function(resolve, reject) {
-    fs.readFile(path.resolve(__dirname, 'hmr-manager-template.js'), 'utf8', function(err, data) {
+    fs.readFile(path.join(__dirname, 'hmr-manager-template.js'), 'utf8', function(err, data) {
       if (err)
         reject(err);
       else
@@ -65,7 +65,7 @@ module.exports = function(bundle, opts) {
     });
   });
 
-  var hmrManagerFilename = path.resolve(__dirname, '__hmr_manager.js');
+  var hmrManagerFilename = path.join(__dirname, '__hmr_manager.js');
 
   function setupPipelineMods() {
     var originalEntries = [];
