@@ -149,11 +149,23 @@
     // know there hasn't been an update.
     var fileReloaders = {
       fs: function(cb) {
-        var fs = require('f'+'s');
+        var fs;
+        try {
+          fs = require('f'+'s');
+        } catch(e) {
+          cb(e);
+          return;
+        }
         fs.readFile(global._hmr.updateUrl || __filename, 'utf8', cb);
       },
       xhr: function(cb) {
-        var xhr = new XMLHttpRequest();
+        var xhr;
+        try {
+          xhr = new XMLHttpRequest();
+        } catch(e) {
+          cb(e);
+          return;
+        }
         xhr.onreadystatechange = function() {
           if (xhr.readyState === 4) {
             if (xhr.status === 200) {
