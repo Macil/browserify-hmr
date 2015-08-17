@@ -13,7 +13,8 @@ cd browserify-hmr/example
 npm i && npm start
 ```
 
-Open http://localhost:8080/ and try updating `label.js`.
+Open [http://localhost:8080/](http://localhost:8080/) and try updating
+`label.js`.
 
 ## Usage
 
