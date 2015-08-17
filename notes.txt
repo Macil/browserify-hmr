@@ -26,8 +26,12 @@ check
 - calls the user's callback with the list of outdated modules
 apply
 - builds a list of outdated modules, same steps as in check
-- builds a list of accepted updates
-  - TODO
+- builds a list of accepted updates:
+  - for each outdated module
+    - if currently module currently exists
+      - if there are any decliners which aren't outdated, then skip
+      - if no accepters or self accepters, then skip (should only happen to original entries)
+    - add to accepted list
 - if ignoreUnaccepted is false and length of accepted updates list != length of
   outdated modules list, then abort
 - prepare for execution
