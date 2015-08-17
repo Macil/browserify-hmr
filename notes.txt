@@ -30,7 +30,8 @@ apply
   - for each outdated module
     - if currently module currently exists
       - if there are any decliners which aren't outdated, then skip
-      - if no accepters or self accepters, then skip (should only happen to original entries)
+      - if any not-outdated parents and no (accepters or self accepters), then
+        skip (should only happen to original entries)
     - add to accepted list
 - if ignoreUnaccepted is false and length of accepted updates list != length of
   outdated modules list, then abort

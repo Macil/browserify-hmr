@@ -65,4 +65,28 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
+  it('deep accepting works', co.wrap(function*() {
+    this.slow();
+    const index = path.join(dir, 'deep-index.js');
+    const depA = path.join(dir, 'deep-dep-a.js');
+    const depB = path.join(dir, 'deep-dep-b.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/deep-index.js', index);
+    yield copy('./test/data/deep-dep-a.js', depA);
+    yield copy('./test/data/deep-dep-b1.js', depB);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/deep-dep-b2.js', depB);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
 });

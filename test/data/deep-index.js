@@ -1,8 +1,11 @@
 var assert = require('assert');
-assert(!global.hasRun);
-global.hasRun = true;
 
-require('./self-dep');
+assert.strictEqual(require('./deep-dep-a'), 1);
+
+module.hot.accept('./deep-dep-a', function() {
+  assert.strictEqual(require('./deep-dep-a'), 2);
+  process.exit(0);
+});
 
 function doCheck() {
   module.hot.check(function(err, outdated) {

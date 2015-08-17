@@ -110,6 +110,11 @@
       }
       return false;
     };
+    StrSet.prototype.every = function(cb) {
+      return !this.some(function(x) {
+        return !cb(x);
+      });
+    };
     StrSet.prototype.hasIntersection = function(otherStrSet) {
       var value;
       if (this._size < otherStrSet._size) {
@@ -129,7 +134,7 @@
       runtimeModuleInfo[name] = {
         index: moduleMeta[name].index,
         hash: moduleMeta[name].hash,
-        parents: moduleMeta[name].parents,
+        parents: new StrSet(moduleMeta[name].parents),
         module: null,
         disposeData: null,
         accepters: new StrSet(),
@@ -247,7 +252,7 @@
       for (var i=0; i<outdated.length; i++) {
         name = outdated[i];
         //jshint -W083
-        forEach(runtimeModuleInfo[name].parents, function(parentName) {
+        runtimeModuleInfo[name].parents.forEach(function(parentName) {
           if (
             runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
             !runtimeModuleInfo[name].accepters.has(parentName) &&
@@ -406,7 +411,11 @@
               if (has(runtimeModuleInfo, name)) {
                 if (
                   runtimeModuleInfo[name].decliners.some(isValueNotInOutdatedModules) ||
-                  (runtimeModuleInfo[name].accepters.size() === 0 && runtimeModuleInfo[name].selfAcceptCbs.length === 0)
+                  (
+                    runtimeModuleInfo[name].accepters.size() === 0 &&
+                    runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
+                    runtimeModuleInfo[name].parents.some(isValueNotInOutdatedModules)
+                  )
                 ) {
                   return false;
                 }
@@ -441,7 +450,7 @@
                 runtimeModuleInfo[an] = {
                   index: an,
                   hash: global._hmr.newLoad.moduleMeta[name].hash,
-                  parents: global._hmr.newLoad.moduleMeta[name].parents,
+                  parents: new StrSet(global._hmr.newLoad.moduleMeta[name].parents),
                   module: null,
                   disposeData: null,
                   accepters: new StrSet(),
@@ -453,7 +462,7 @@
                 };
               } else {
                 runtimeModuleInfo[an].hash = global._hmr.newLoad.moduleMeta[an].hash;
-                runtimeModuleInfo[an].parents = global._hmr.newLoad.moduleMeta[an].parents;
+                runtimeModuleInfo[an].parents = new StrSet(global._hmr.newLoad.moduleMeta[an].parents);
                 runtimeModuleInfo[an].module.exports = {};
                 runtimeModuleInfo[an].accepting.forEach(function(accepted) {
                   runtimeModuleInfo[accepted].accepters.del(an);

@@ -13,7 +13,7 @@ function doCheck() {
       //console.error('Check error', err);
     }
     if (outdated) {
-      module.hot.apply(function(err, outdatedModules) {
+      module.hot.apply(function(err, updated) {
         console.error('Should not happen', err);
         process.exit(1);
       });
