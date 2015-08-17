@@ -35,7 +35,11 @@ if (module.hot) {
       }
       if (outdated) {
         module.hot.apply(function(err, updated) {
-          console.log('Replaced modules', updated);
+          if (err) {
+            console.error('Update error', err);
+          } else {
+            console.log('Replaced modules', updated);
+          }
           setTimeout(doCheck, 2000);
         });
       } else {
