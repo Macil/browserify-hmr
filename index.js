@@ -26,8 +26,21 @@ var readManagerTemplate = _.once(function() {
   });
 });
 
+var validUpdateModes = ['xhr', 'fs'];
+var updateModesNeedingUrl = ['xhr'];
+
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
+  var updateMode = opts.mode||opts.m||'xhr';
+  var updateUrl = opts.url||opts.u||null;
+  var updateCacheBust = Boolean(has(opts, 'cacheBust') ? opts.cacheBust : has(opts, 'b') ? opts.b : true);
+
+  if (!_.includes(validUpdateModes, updateMode)) {
+    throw new Error("Invalid mode "+updateMode);
+  }
+  if (!updateUrl && _.includes(updateModesNeedingUrl, updateMode)) {
+    throw new Error("url option must be specified for "+updateMode+" mode");
+  }
 
   bundle.transform(function(file, opts) {
     if (file === hmrManagerFilename) {
@@ -119,8 +132,9 @@ module.exports = function(bundle, opts) {
         managerRow.source = mgrTemplate
           .replace('null/*!^^moduleMeta*/', JSON.stringify(moduleMeta))
           .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
-          .replace('null/*!^^updateUrl*/', JSON.stringify('bundle.js'))
-          .replace('null/*!^^updateMode*/', JSON.stringify('fs'));
+          .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
+          .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
+          .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust));
         self.push(managerRow);
         labelRows.forEach(function(row) {
           self.push(row);

@@ -4,6 +4,7 @@
   var originalEntries = null/*!^^originalEntries*/;
   var updateUrl = null/*!^^updateUrl*/;
   var updateMode = null/*!^^updateMode*/;
+  var updateCacheBust = null/*!^^updateCacheBust*/;
 
   var name, i, len;
 
@@ -144,13 +145,33 @@
       }
     }
 
+    // loaders take a callback(err, data). They may give null for data if they
+    // know there hasn't been an update.
     var fileReloaders = {
       fs: function(cb) {
-        var fs = require('fs');
-        fs.readFile(global._hmr.updateUrl, 'utf8', cb);
+        var fs = require('f'+'s');
+        fs.readFile(global._hmr.updateUrl || __filename, 'utf8', cb);
+      },
+      xhr: function(cb) {
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+              cb(null, xhr.responseText);
+            } else {
+              cb(new Error("Request had response "+xhr.status));
+            }
+          }
+        };
+        var url = global._hmr.updateUrl + (updateCacheBust?'?_v='+(+new Date()):'');
+        xhr.open('GET', url, true);
+        xhr.send();
       }
     };
 
+    var lastScriptData = null;
+
+    // cb(err, expectUpdate)
     var reloadAndRunScript = function(cb) {
       if (!has(fileReloaders, global._hmr.updateMode)) {
         cb(new Error("updateMode "+global._hmr.updateMode+" not implemented"));
@@ -158,14 +179,19 @@
       }
       var reloader = fileReloaders[global._hmr.updateMode];
       reloader(function(err, data) {
-        if (err) {
-          cb(err);
+        if (err || !data || lastScriptData === data) {
+          cb(err, false);
           return;
         }
+        lastScriptData = data;
         global._hmr.newLoad = null;
         try {
           //jshint evil:true
-          new Function('require', '__filename', '__dirname', data)(require, __filename, __dirname);
+          if (typeof __filename !== 'undefined' && typeof __dirname !== 'undefined') {
+            new Function('require', '__filename', '__dirname', data)(require, __filename, __dirname);
+          } else {
+            new Function('require', data)(require);
+          }
           // running the file sets _hmr.newLoad
         } catch (err2) {
           global._hmr.newLoad = null;
@@ -176,7 +202,7 @@
           cb(new Error("Reloaded script did not set hot module reload data"));
           return;
         }
-        cb(null);
+        cb(null, true);
       });
     };
 
@@ -323,8 +349,8 @@
             }
 
             global._hmr.setStatus('check');
-            reloadAndRunScript(function(err) {
-              if (err) {
+            reloadAndRunScript(function(err, expectUpdate) {
+              if (err || !expectUpdate) {
                 global._hmr.setStatus('idle');
                 cb(err);
                 return;
