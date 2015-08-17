@@ -518,7 +518,7 @@
                   }
                 });
 
-                cb(errCanWait, outdatedModules);
+                cb(errCanWait, acceptedUpdates);
               },
               status: function(cb) {
                 if (cb) {
