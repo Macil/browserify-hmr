@@ -1,0 +1,29 @@
+{
+  "name": "browserify-hmr",
+  "version": "0.1.0",
+  "description": "Hot Module Replacement plugin for Browserify",
+  "main": "index.js",
+  "directories": {
+    "example": "example"
+  },
+  "dependencies": {
+    "lodash": "^3.10.1",
+    "rsvp": "^3.0.21",
+    "through2": "^2.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "browserify",
+    "hmr",
+    "reload",
+    "hot",
+    "edit",
+    "live",
+    "livereload"
+  ],
+  "author": "Chris Cowan <agentme49@gmail.com>",
+  "license": "MIT"
+}
