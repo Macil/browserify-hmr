@@ -20,7 +20,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('basic case works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'basic-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -43,7 +43,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('self accepting works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'self-index.js');
     const dep = path.join(dir, 'self-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -66,7 +66,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('deep accepting works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'deep-index.js');
     const depA = path.join(dir, 'deep-dep-a.js');
     const depB = path.join(dir, 'deep-dep-b.js');
@@ -91,7 +91,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('new dependency works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'new-index.js');
     const depA = path.join(dir, 'new-dep-a.js');
     const depB = path.join(dir, 'new-dep-b.js');
@@ -116,7 +116,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('remove dependency works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'remove-index.js');
     const depA = path.join(dir, 'remove-dep-a.js');
     const depB = path.join(dir, 'remove-dep-b.js');
