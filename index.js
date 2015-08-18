@@ -44,7 +44,7 @@ module.exports = function(bundle, opts) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
 
-  var hmrManagerFilename = path.join(__dirname, '__hmr_manager.js');
+  var hmrManagerFilename;
 
   function setupPipelineMods() {
     var originalEntries = [];
@@ -59,6 +59,10 @@ module.exports = function(bundle, opts) {
       var source = originalEntries.map(function(name) {
         return 'require('+JSON.stringify(name)+');\n';
       }).join('');
+
+      // Put the hmr file name in the same directory as an entry file in order
+      // to prevent this: https://github.com/babel/babelify/issues/85
+      hmrManagerFilename = path.join(path.dirname(originalEntries[0]), '__hmr_manager.js');
       this.push({
         entry: true,
         expose: false,
