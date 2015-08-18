@@ -48,7 +48,7 @@ module.exports = function(bundle, opts) {
     }
     var hasEmittedHeader = false;
     var header = '_hmr.initModule('+JSON.stringify(file)+', module);\n(function(){\n';
-    var footer = '}).call(this, arguments);\n';
+    var footer = '\n}).call(this, arguments);\n';
     return through.obj(function(row, enc, next) {
       if (!hasEmittedHeader) {
         hasEmittedHeader = true;
