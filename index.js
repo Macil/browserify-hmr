@@ -42,31 +42,6 @@ module.exports = function(bundle, opts) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
 
-  bundle.transform(function(file, opts) {
-    if (file === hmrManagerFilename) {
-      return through.obj();
-    }
-    var hasEmittedHeader = false;
-    var header = '_hmr.initModule('+JSON.stringify(file)+', module);\n(function(){\n';
-    var footer = '\n}).call(this, arguments);\n';
-    return through.obj(function(row, enc, next) {
-      if (!hasEmittedHeader) {
-        hasEmittedHeader = true;
-        this.push(header);
-      }
-      next(null, row);
-    }, function(done) {
-      if (!hasEmittedHeader) {
-        hasEmittedHeader = true;
-        this.push(header);
-      }
-      this.push(footer);
-      done();
-    });
-  }, {
-    global: true
-  });
-
   var hmrManagerFilename = path.join(__dirname, '__hmr_manager.js');
 
   function setupPipelineMods() {
@@ -115,6 +90,17 @@ module.exports = function(bundle, opts) {
         });
       }
       next(null, row);
+    }));
+
+    bundle.pipeline.get('syntax').push(through.obj(function(row, enc, next) {
+      if (row.file === hmrManagerFilename) {
+        next(null, row);
+      } else {
+        var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
+        var footer = '\n}).call(this, arguments);\n';
+        row.source = header + row.source + footer;
+        next(null, row);
+      }
     }));
 
     var labelRows = [];
