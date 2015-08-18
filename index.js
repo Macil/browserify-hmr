@@ -63,6 +63,8 @@ module.exports = function(bundle, opts) {
       this.push(footer);
       done();
     });
+  }, {
+    global: true
   });
 
   var hmrManagerFilename = path.join(__dirname, '__hmr_manager.js');
