@@ -30,6 +30,7 @@
   },
   "keywords": [
     "browserify",
+    "browserify-plugin",
     "hmr",
     "reload",
     "hot",
