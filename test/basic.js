@@ -140,4 +140,25 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
+  it.only('lone entry without accepts should not update', co.wrap(function*() {
+    this.slow();
+    const index = path.join(dir, 'lone-index.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/lone-index1.js', index);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/lone-index2.js', index);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
 });
