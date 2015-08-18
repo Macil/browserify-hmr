@@ -3,9 +3,6 @@
   "version": "0.1.4",
   "description": "Hot Module Replacement plugin for Browserify",
   "main": "index.js",
-  "directories": {
-    "example": "example"
-  },
   "dependencies": {
     "lodash": "^3.10.1",
     "rsvp": "^3.0.21",
