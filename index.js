@@ -85,8 +85,11 @@ module.exports = function(bundle, opts) {
       if (row.file !== hmrManagerFilename) {
         makeModuleMetaEntry(row.file);
         _.forOwn(row.deps, function(name, ref) {
-          makeModuleMetaEntry(name);
-          moduleMeta[name].parents.push(row.file);
+          // dependencies that aren't included in the bundle have the name false
+          if (name) {
+            makeModuleMetaEntry(name);
+            moduleMeta[name].parents.push(row.file);
+          }
         });
       }
       next(null, row);
