@@ -36,7 +36,8 @@ describe('browserify-hmr', function() {
         yield delay(200);
         yield copy('./test/data/basic-dep2.js', dep);
         yield run('./node_modules/.bin/browserify', [
-          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+          // test --full-paths too
+          '--node','--full-paths','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
       })
     ]);

@@ -144,7 +144,8 @@ module.exports = function(bundle, opts) {
     var managerRow = null;
     bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
       if (row.file !== hmrManagerFilename) {
-        moduleMeta[row.file].index = row.index;
+        // row.id used when fullPaths flag is used
+        moduleMeta[row.file].index = has(row, 'index') ? row.index : row.id;
         moduleMeta[row.file].hash = hash(row.source);
         labelRows.push(row);
       } else {
