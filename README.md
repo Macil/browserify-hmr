@@ -67,7 +67,6 @@ if more control over the timing of the reloads is desired.
 
 ## TODO and gotchas
 
-* sourcemaps support
 * more tests
 * make a Browserify-compatible react-hot-loader transform
 * Only one browserify-hmr built script can be active in a javascript context at

@@ -4,8 +4,10 @@
   "description": "Hot Module Replacement plugin for Browserify",
   "main": "index.js",
   "dependencies": {
+    "convert-source-map": "^1.1.1",
     "lodash": "^3.10.1",
     "rsvp": "^3.0.21",
+    "source-map": "^0.4.4",
     "through2": "^2.0.0"
   },
   "devDependencies": {

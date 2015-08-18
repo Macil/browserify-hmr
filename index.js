@@ -1,5 +1,7 @@
 var path = require('path');
 var through = require('through2');
+var convert = require('convert-source-map');
+var sm = require('source-map');
 var crypto = require('crypto');
 var fs = require('fs');
 var _ = require('lodash');
@@ -101,7 +103,35 @@ module.exports = function(bundle, opts) {
       } else {
         var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
         var footer = '\n}).call(this, arguments);\n';
-        row.source = header + row.source + footer;
+
+        var inputMapConsumer;
+        var inputMap = convert.fromSource(row.source);
+        if (inputMap) {
+          inputMapConsumer = new sm.SourceMapConsumer(inputMap.toObject());
+          row.source = convert.removeComments(row.source);
+        }
+        var outputMapGenerator = new sm.SourceMapGenerator({
+          file: row.file
+        });
+        var lines = row.source.split('\n').length;
+        for (var i=1; i<=lines; i++) {
+          outputMapGenerator.addMapping({
+            generated: {line:i+2,column:0},
+            original: {line:i,column:0},
+            source: row.file
+          });
+        }
+        outputMapGenerator.setSourceContent(row.file, row.source);
+        if (inputMapConsumer) {
+          outputMapGenerator.applySourceMap(inputMapConsumer);
+        }
+        var mergedMap = outputMapGenerator.toJSON();
+        if (inputMap) {
+          mergedMap.sources = inputMap.sources || [inputMap.file ? inputMap.file : row.file];
+          mergedMap.file = inputMap.file;
+        }
+        row.source = header + row.source + footer +
+          '\n' + convert.fromObject(mergedMap).toComment();
         next(null, row);
       }
     }));
