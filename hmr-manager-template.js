@@ -474,7 +474,7 @@
                 // updated modules
                 runtimeModuleInfo[an].hash = global._hmr.newLoad.moduleMeta[an].hash;
                 runtimeModuleInfo[an].parents = new StrSet(global._hmr.newLoad.moduleMeta[an].parents);
-                runtimeModuleInfo[an].module.exports = {};
+                runtimeModuleInfo[an].module = null;
                 runtimeModuleInfo[an].accepting.forEach(function(accepted) {
                   runtimeModuleInfo[accepted].accepters.del(an);
                 });
