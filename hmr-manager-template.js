@@ -433,11 +433,10 @@
             for (i=0, len=acceptedUpdates.length; i<len; i++) {
               an = acceptedUpdates[i];
               if (has(runtimeModuleInfo, an)) {
+                runtimeModuleInfo[an].disposeData = {};
                 for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
                   try {
-                    var data = {};
-                    runtimeModuleInfo[an].disposeHandlers[j].call(null, data);
-                    runtimeModuleInfo[an].disposeData = data;
+                    runtimeModuleInfo[an].disposeHandlers[j].call(null, runtimeModuleInfo[an].disposeData);
                   } catch(e) {
                     global._hmr.setStatus('idle');
                     cb(e || new Error("Unknown dispose callback error"));
