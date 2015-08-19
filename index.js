@@ -31,6 +31,25 @@ var readManagerTemplate = _.once(function() {
 var validUpdateModes = ['xhr', 'fs'];
 var updateModesNeedingUrl = ['xhr'];
 
+function makeIdentitySourceMap(content, resourcePath) {
+  var map = new sm.SourceMapGenerator();
+  map.setSourceContent(resourcePath, content);
+  content.split('\n').map(function(line, index) {
+    map.addMapping({
+      source: resourcePath,
+      original: {
+        line: index+1,
+        column: 0
+      },
+      generated: {
+        line: index+1,
+        column: 0
+      }
+    });
+  });
+  return map.toJSON();
+}
+
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
   var updateMode = opts.mode||opts.m||'xhr';
@@ -108,34 +127,23 @@ module.exports = function(bundle, opts) {
         var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
         var footer = '\n}).call(this, arguments);\n';
 
-        var inputMapConsumer;
-        var inputMap = convert.fromSource(row.source);
-        if (inputMap) {
-          inputMapConsumer = new sm.SourceMapConsumer(inputMap.toObject());
+        var inputMapCV = convert.fromSource(row.source);
+        var inputMap;
+        if (inputMapCV) {
+          inputMap = inputMapCV.toObject();
           row.source = convert.removeComments(row.source);
+        } else {
+          inputMap = makeIdentitySourceMap(row.source, row.file);
         }
-        var outputMapGenerator = new sm.SourceMapGenerator({
-          file: row.file
-        });
-        var lines = row.source.split('\n').length;
-        for (var i=1; i<=lines; i++) {
-          outputMapGenerator.addMapping({
-            generated: {line:i+2,column:0},
-            original: {line:i,column:0},
-            source: row.file
-          });
-        }
-        outputMapGenerator.setSourceContent(row.file, row.source);
-        if (inputMapConsumer) {
-          outputMapGenerator.applySourceMap(inputMapConsumer);
-        }
-        var mergedMap = outputMapGenerator.toJSON();
-        if (inputMap) {
-          mergedMap.sources = inputMap.sources || [inputMap.file ? inputMap.file : row.file];
-          mergedMap.file = inputMap.file;
-        }
-        row.source = header + row.source + footer +
-          '\n' + convert.fromObject(mergedMap).toComment();
+
+        var node = new sm.SourceNode(null, null, null, [
+          new sm.SourceNode(null, null, null, header),
+          sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
+          new sm.SourceNode(null, null, null, footer)
+        ]);
+
+        var result = node.toStringWithSourceMap();
+        row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
         next(null, row);
       }
     }));
