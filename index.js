@@ -11,7 +11,7 @@ function has(object, propName) {
   return Object.prototype.hasOwnProperty.call(object, propName);
 }
 
-function hash(str) {
+function hashSource(str) {
   var hasher = crypto.createHash('sha256');
   hasher.update(str);
   return hasher.digest('base64').slice(0, 20);
@@ -64,6 +64,9 @@ module.exports = function(bundle, opts) {
   }
 
   var hmrManagerFilename;
+
+  // keys are filenames, values are {hash, transformedSource}
+  var transformCache = {};
 
   function setupPipelineMods() {
     var originalEntries = [];
@@ -124,26 +127,36 @@ module.exports = function(bundle, opts) {
       if (row.file === hmrManagerFilename) {
         next(null, row);
       } else {
-        var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
-        var footer = '\n}).call(this, arguments);\n';
-
-        var inputMapCV = convert.fromSource(row.source);
-        var inputMap;
-        if (inputMapCV) {
-          inputMap = inputMapCV.toObject();
-          row.source = convert.removeComments(row.source);
+        var hash = moduleMeta[row.file].hash = hashSource(row.source);
+        if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
+          row.source = transformCache[row.file].transformedSource;
         } else {
-          inputMap = makeIdentitySourceMap(row.source, row.file);
+          var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
+          var footer = '\n}).call(this, arguments);\n';
+
+          var inputMapCV = convert.fromSource(row.source);
+          var inputMap;
+          if (inputMapCV) {
+            inputMap = inputMapCV.toObject();
+            row.source = convert.removeComments(row.source);
+          } else {
+            inputMap = makeIdentitySourceMap(row.source, row.file);
+          }
+
+          var node = new sm.SourceNode(null, null, null, [
+            new sm.SourceNode(null, null, null, header),
+            sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
+            new sm.SourceNode(null, null, null, footer)
+          ]);
+
+          var result = node.toStringWithSourceMap();
+          row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
+
+          transformCache[row.file] = {
+            hash: hash,
+            transformedSource: row.source
+          };
         }
-
-        var node = new sm.SourceNode(null, null, null, [
-          new sm.SourceNode(null, null, null, header),
-          sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
-          new sm.SourceNode(null, null, null, footer)
-        ]);
-
-        var result = node.toStringWithSourceMap();
-        row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
         next(null, row);
       }
     }));
@@ -154,7 +167,6 @@ module.exports = function(bundle, opts) {
       if (row.file !== hmrManagerFilename) {
         // row.id used when fullPaths flag is used
         moduleMeta[row.file].index = has(row, 'index') ? row.index : row.id;
-        moduleMeta[row.file].hash = hash(row.source);
         labelRows.push(row);
       } else {
         managerRow = row;
