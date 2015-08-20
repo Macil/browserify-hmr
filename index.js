@@ -165,17 +165,16 @@ module.exports = function(bundle, opts) {
       }
     }));
 
-    var labelRows = [];
     var managerRow = null;
     bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
       if (row.file !== hmrManagerFilename) {
         // row.id used when fullPaths flag is used
         moduleMeta[row.file].index = has(row, 'index') ? row.index : row.id;
-        labelRows.push(row);
+        next(null, row);
       } else {
         managerRow = row;
+        next(null);
       }
-      next(null);
     }, function(done) {
       var self = this;
       readManagerTemplate().then(function(mgrTemplate) {
@@ -187,9 +186,6 @@ module.exports = function(bundle, opts) {
           .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
           .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey));
         self.push(managerRow);
-        labelRows.forEach(function(row) {
-          self.push(row);
-        });
       }).then(done, done);
     }));
   }
