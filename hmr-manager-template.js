@@ -74,7 +74,7 @@
     }
   }
 
-  if (!global._hmr[bundleKey]) {
+  if (!has(global._hmr, bundleKey)) {
     var StrSet = function StrSet(other) {
       this._map = {};
       this._size = 0;
