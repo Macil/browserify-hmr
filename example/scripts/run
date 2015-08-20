@@ -1,4 +1,4 @@
 #!/bin/bash
-./node_modules/.bin/watchify -vp [ browserify-hmr -u /bundle.js -b false ] index.js -o bundle.js  &
+./node_modules/.bin/watchify -vdp [ browserify-hmr -u /bundle.js -b false ] index.js -o bundle.js  &
 ./node_modules/.bin/http-server -c 1 -a localhost &
 wait
