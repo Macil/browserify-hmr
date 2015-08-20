@@ -1,3 +1,5 @@
+'use strict';
+
 var path = require('path');
 var through = require('through2');
 var convert = require('convert-source-map');
