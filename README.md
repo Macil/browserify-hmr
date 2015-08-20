@@ -73,8 +73,3 @@ if more control over the timing of the reloads is desired.
 * There are known bugs currently where changes to modules without update
   accepters can cause the updates to bubble up to the entry and cause many
   modules to be reloaded incorrectly.
-* Only one browserify-hmr built script can be active in a javascript context at
-  once right now because they would all use the same global to synchronize
-  state. We should make it so the plugin takes an option to allow a named
-  sub-object of the global to be used instead to allow multiple browserify-hmr
-  bundles to play nice together.

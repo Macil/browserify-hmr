@@ -5,6 +5,7 @@
   var updateUrl = null/*!^^updateUrl*/;
   var updateMode = null/*!^^updateMode*/;
   var updateCacheBust = null/*!^^updateCacheBust*/;
+  var bundleKey = null/*!^^bundleKey*/;
 
   var name, i, len;
 
@@ -66,6 +67,14 @@
   };
 
   if (!global._hmr) {
+    try {
+      Object.defineProperty(global, '_hmr', {value: {}});
+    } catch(e) {
+      global._hmr = {};
+    }
+  }
+
+  if (!global._hmr[bundleKey]) {
     var StrSet = function StrSet(other) {
       this._map = {};
       this._size = 0;
@@ -162,7 +171,7 @@
           cb(e);
           return;
         }
-        fs.readFile(global._hmr.updateUrl || __filename, 'utf8', cb);
+        fs.readFile(localHmr.updateUrl || __filename, 'utf8', cb);
       },
       xhr: function(cb) {
         var xhr;
@@ -181,7 +190,7 @@
             }
           }
         };
-        var url = global._hmr.updateUrl + (updateCacheBust?'?_v='+(+new Date()):'');
+        var url = localHmr.updateUrl + (updateCacheBust?'?_v='+(+new Date()):'');
         xhr.open('GET', url, true);
         xhr.send();
       }
@@ -191,18 +200,18 @@
 
     // cb(err, expectUpdate)
     var reloadAndRunScript = function(cb) {
-      if (!has(fileReloaders, global._hmr.updateMode)) {
-        cb(new Error("updateMode "+global._hmr.updateMode+" not implemented"));
+      if (!has(fileReloaders, localHmr.updateMode)) {
+        cb(new Error("updateMode "+localHmr.updateMode+" not implemented"));
         return;
       }
-      var reloader = fileReloaders[global._hmr.updateMode];
+      var reloader = fileReloaders[localHmr.updateMode];
       reloader(function(err, data) {
         if (err || !data || lastScriptData === data) {
           cb(err, false);
           return;
         }
         lastScriptData = data;
-        global._hmr.newLoad = null;
+        localHmr.newLoad = null;
         try {
           //jshint evil:true
           if (typeof __filename !== 'undefined' && typeof __dirname !== 'undefined') {
@@ -212,11 +221,11 @@
           }
           // running the file sets _hmr.newLoad
         } catch (err2) {
-          global._hmr.newLoad = null;
+          localHmr.newLoad = null;
           cb(err2);
           return;
         }
-        if (!global._hmr.newLoad) {
+        if (!localHmr.newLoad) {
           cb(new Error("Reloaded script did not set hot module reload data"));
           return;
         }
@@ -231,16 +240,16 @@
       for (name in runtimeModuleInfo) {
         if (has(runtimeModuleInfo, name)) {
           if (
-            !has(global._hmr.newLoad.moduleMeta, name) ||
-            runtimeModuleInfo[name].hash !== global._hmr.newLoad.moduleMeta[name].hash
+            !has(localHmr.newLoad.moduleMeta, name) ||
+            runtimeModuleInfo[name].hash !== localHmr.newLoad.moduleMeta[name].hash
           ) {
             outdated.push(name);
           }
         }
       }
       // add brand new modules
-      for (name in global._hmr.newLoad.moduleMeta) {
-        if (has(global._hmr.newLoad.moduleMeta, name)) {
+      for (name in localHmr.newLoad.moduleMeta) {
+        if (has(localHmr.newLoad.moduleMeta, name)) {
           if (!has(runtimeModuleInfo, name)) {
             outdated.push(name);
           }
@@ -268,7 +277,7 @@
       return outdated;
     };
 
-    global._hmr = {
+    var localHmr = {
       updateUrl: updateUrl,
       updateMode: updateMode,
       runtimeModuleInfo: runtimeModuleInfo,
@@ -314,7 +323,7 @@
                 runtimeModuleInfo[name].accepting.add(depName);
               });
               if (cb) {
-                global._hmr.updateHandlers.push({
+                localHmr.updateHandlers.push({
                   accepter: name,
                   deps: depNames,
                   cb: cb
@@ -369,19 +378,19 @@
               return;
             }
 
-            global._hmr.setStatus('check');
+            localHmr.setStatus('check');
             reloadAndRunScript(function(err, expectUpdate) {
               if (err || !expectUpdate) {
-                global._hmr.setStatus('idle');
+                localHmr.setStatus('idle');
                 cb(err, null);
                 return;
               }
               var outdatedModules = getOutdatedModules();
               if (outdatedModules.length === 0) {
-                global._hmr.setStatus('idle');
+                localHmr.setStatus('idle');
                 cb(null, null);
               } else {
-                global._hmr.setStatus('ready');
+                localHmr.setStatus('ready');
                 if (autoApply) {
                   module.hot.apply(autoApply, cb);
                 } else {
@@ -425,7 +434,7 @@
               return true;
             });
             if (!ignoreUnaccepted && outdatedModules.length !== acceptedUpdates.length) {
-              global._hmr.setStatus('idle');
+              localHmr.setStatus('idle');
               cb(new Error("Some updates were declined"));
               return;
             }
@@ -438,7 +447,7 @@
                   try {
                     runtimeModuleInfo[an].disposeHandlers[j].call(null, runtimeModuleInfo[an].disposeData);
                   } catch(e) {
-                    global._hmr.setStatus('idle');
+                    localHmr.setStatus('idle');
                     cb(e || new Error("Unknown dispose callback error"));
                     return;
                   }
@@ -453,8 +462,8 @@
                 // new modules
                 runtimeModuleInfo[an] = {
                   index: an,
-                  hash: global._hmr.newLoad.moduleMeta[name].hash,
-                  parents: new StrSet(global._hmr.newLoad.moduleMeta[name].parents),
+                  hash: localHmr.newLoad.moduleMeta[name].hash,
+                  parents: new StrSet(localHmr.newLoad.moduleMeta[name].parents),
                   module: null,
                   disposeData: null,
                   accepters: new StrSet(),
@@ -464,15 +473,15 @@
                   selfAcceptCbs: [],
                   disposeHandlers: []
                 };
-              } else if (!has(global._hmr.newLoad.moduleMeta, an)) {
+              } else if (!has(localHmr.newLoad.moduleMeta, an)) {
                 // removed modules
                 delete cachedModules[runtimeModuleInfo[an].index];
                 delete runtimeModuleInfo[an];
                 continue;
               } else {
                 // updated modules
-                runtimeModuleInfo[an].hash = global._hmr.newLoad.moduleMeta[an].hash;
-                runtimeModuleInfo[an].parents = new StrSet(global._hmr.newLoad.moduleMeta[an].parents);
+                runtimeModuleInfo[an].hash = localHmr.newLoad.moduleMeta[an].hash;
+                runtimeModuleInfo[an].parents = new StrSet(localHmr.newLoad.moduleMeta[an].parents);
                 runtimeModuleInfo[an].module = null;
                 runtimeModuleInfo[an].accepting.forEach(function(accepted) {
                   runtimeModuleInfo[accepted].accepters.del(an);
@@ -491,12 +500,12 @@
 
               moduleDefs[runtimeModuleInfo[an].index] = [
                 // module function
-                global._hmr.newLoad.moduleDefs[global._hmr.newLoad.moduleMeta[an].index][0],
+                localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][0],
                 // module deps
-                mapValues(global._hmr.newLoad.moduleDefs[global._hmr.newLoad.moduleMeta[an].index][1], function(depIndex, depRef) {
-                  var depName = global._hmr.newLoad.moduleIndexesToNames[depIndex];
-                  if (has(global._hmr.runtimeModuleInfo, depName)) {
-                    return global._hmr.runtimeModuleInfo[depName].index;
+                mapValues(localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][1], function(depIndex, depRef) {
+                  var depName = localHmr.newLoad.moduleIndexesToNames[depIndex];
+                  if (has(localHmr.runtimeModuleInfo, depName)) {
+                    return localHmr.runtimeModuleInfo[depName].index;
                   } else {
                     return depName;
                   }
@@ -508,7 +517,7 @@
             // Update the accept handlers list and call the right ones
             var errCanWait = null;
             var updatedNames = new StrSet(acceptedUpdates);
-            var oldUpdateHandlers = global._hmr.updateHandlers;
+            var oldUpdateHandlers = localHmr.updateHandlers;
             var relevantUpdateHandlers = [];
             var newUpdateHandlers = [];
             for (i=0, len=oldUpdateHandlers.length; i<len; i++) {
@@ -519,7 +528,7 @@
                 relevantUpdateHandlers.push(oldUpdateHandlers[i]);
               }
             }
-            global._hmr.updateHandlers = newUpdateHandlers;
+            localHmr.updateHandlers = newUpdateHandlers;
             for (i=0, len=relevantUpdateHandlers.length; i<len; i++) {
               try {
                 relevantUpdateHandlers[i].cb.call(null, acceptedUpdates);
@@ -543,32 +552,33 @@
               }
             });
 
-            global._hmr.setStatus('idle');
+            localHmr.setStatus('idle');
             cb(errCanWait, acceptedUpdates);
           },
           status: function(cb) {
             if (cb) {
               return this.addStatusHandler(cb);
             }
-            return global._hmr.status;
+            return localHmr.status;
           },
           addStatusHandler: function(cb) {
-            global._hmr.statusHandlers.push(cb);
+            localHmr.statusHandlers.push(cb);
           },
           removeStatusHandler: function(cb) {
-            var ix = global._hmr.statusHandlers.indexOf(cb);
+            var ix = localHmr.statusHandlers.indexOf(cb);
             if (ix !== -1) {
-              global._hmr.statusHandlers.splice(ix, 1);
+              localHmr.statusHandlers.splice(ix, 1);
             }
           }
         };
       }
     };
+    global._hmr[bundleKey] = localHmr;
     for (i=0, len=originalEntries.length; i<len; i++) {
       require(originalEntries[i]);
     }
   } else { // We're in a reload!
-    global._hmr.newLoad = {
+    global._hmr[bundleKey].newLoad = {
       moduleDefs: moduleDefs,
       moduleMeta: moduleMeta,
       moduleIndexesToNames: moduleIndexesToNames

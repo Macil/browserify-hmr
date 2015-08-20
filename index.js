@@ -57,6 +57,7 @@ module.exports = function(bundle, opts) {
   var updateMode = opts.mode||opts.m||'xhr';
   var updateUrl = opts.url||opts.u||null;
   var updateCacheBust = Boolean(has(opts, 'cacheBust') ? opts.cacheBust : has(opts, 'b') ? opts.b : true);
+  var bundleKey = opts.key || updateMode+':'+(updateUrl||bundle.argv.outfile);
 
   if (!_.includes(validUpdateModes, updateMode)) {
     throw new Error("Invalid mode "+updateMode);
@@ -133,7 +134,8 @@ module.exports = function(bundle, opts) {
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
           row.source = transformCache[row.file].transformedSource;
         } else {
-          var header = '_hmr.initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
+          var header = '_hmr['+JSON.stringify(bundleKey)+
+            '].initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
           var footer = '\n}).call(this, arguments);\n';
 
           var inputMapCV = convert.fromSource(row.source);
@@ -182,7 +184,8 @@ module.exports = function(bundle, opts) {
           .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
           .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
           .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
-          .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust));
+          .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
+          .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey));
         self.push(managerRow);
         labelRows.forEach(function(row) {
           self.push(row);

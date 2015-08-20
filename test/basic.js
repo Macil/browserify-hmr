@@ -66,6 +66,52 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
+  it('multiple bundles work', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    // run the self-accepter initial bundle, then the basic case initial
+    // bundle, then update the basic case bundle and make sure that works.
+
+    const selfIndex = path.join(dir, 'self-index.js');
+    const selfDep = path.join(dir, 'self-dep.js');
+    const selfBundle = path.join(dir, 'bundle.js');
+
+    const basicIndex = path.join(dir, 'basic-index.js');
+    const basicDep = path.join(dir, 'basic-dep.js');
+    const basicBundle = path.join(dir, 'basic-bundle.js');
+
+    yield Promise.all([
+      co(function*() {
+        yield copy('./test/data/self-index.js', selfIndex);
+        yield copy('./test/data/self-dep1.js', selfDep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',selfIndex,'-o',selfBundle
+        ]);
+      }),
+      co(function*() {
+        yield copy('./test/data/basic-index.js', basicIndex);
+        yield copy('./test/data/basic-dep1.js', basicDep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',basicIndex,'-o',basicBundle
+        ]);
+      })
+    ]);
+
+    yield Promise.all([
+      run('node', [
+        '-e',
+        `require(${JSON.stringify(selfBundle)}); require(${JSON.stringify(basicBundle)});`
+      ]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/basic-dep2.js', basicDep);
+        yield run('./node_modules/.bin/browserify', [
+          // test --full-paths too
+          '--node','--full-paths','-p','[','./index','-m','fs',']',basicIndex,'-o',basicBundle
+        ]);
+      })
+    ]);
+  }));
+
   it('deep accepting works', co.wrap(function*() {
     this.slow();this.timeout(5000);
     const index = path.join(dir, 'deep-index.js');
