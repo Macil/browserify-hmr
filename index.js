@@ -13,7 +13,7 @@ function has(object, propName) {
   return Object.prototype.hasOwnProperty.call(object, propName);
 }
 
-function hashSource(str) {
+function hashStr(str) {
   var hasher = crypto.createHash('sha256');
   hasher.update(str);
   return hasher.digest('base64').slice(0, 20);
@@ -52,21 +52,24 @@ function makeIdentitySourceMap(content, resourcePath) {
   return map.toJSON();
 }
 
+function readOpt(opts, long, short, defval) {
+  return has(opts, long) ? opts[long] : has(opts, short) ? opts[short] : defval;
+}
+
+function boolOpt(value) {
+  return Boolean(value && value !== 'false');
+}
+
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
-  var updateMode = opts.mode||opts.m||'ajax';
-  var updateUrl = opts.url||opts.u||null;
-
-  var updateCacheBust = (function(){
-    var value = has(opts, 'cacheBust') ? opts.cacheBust : has(opts, 'b') ? opts.b : true;
-    return Boolean(value && value !== 'false');
-  })();
-  var bundleKey = opts.key || updateMode+':'+(updateUrl||bundle.argv.outfile);
-
+  var updateMode = readOpt(opts, 'mode', 'm', 'ajax');
   if (updateMode === 'xhr') {
     console.warn('Use update mode "ajax" instead of "xhr".');
     updateMode = 'ajax';
   }
+  var updateUrl = readOpt(opts, 'url', 'u', null);
+  var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', true));
+  var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+(updateUrl||bundle.argv.outfile));
 
   if (!_.includes(validUpdateModes, updateMode)) {
     throw new Error("Invalid mode "+updateMode);
@@ -145,7 +148,7 @@ module.exports = function(bundle, opts) {
       if (row.file === hmrManagerFilename) {
         next(null, row);
       } else {
-        var hash = moduleMeta[fileKey(row.file)].hash = hashSource(row.source);
+        var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
           row.source = transformCache[row.file].transformedSource;
         } else {
