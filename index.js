@@ -75,6 +75,12 @@ module.exports = function(bundle, opts) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
 
+  var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
+
+  function fileKey(filename) {
+    return path.relative(basedir, filename);
+  }
+
   var hmrManagerFilename;
 
   // keys are filenames, values are {hash, transformedSource}
@@ -123,12 +129,12 @@ module.exports = function(bundle, opts) {
 
     bundle.pipeline.get('deps').push(through.obj(function(row, enc, next) {
       if (row.file !== hmrManagerFilename) {
-        makeModuleMetaEntry(row.file);
+        makeModuleMetaEntry(fileKey(row.file));
         _.forOwn(row.deps, function(name, ref) {
           // dependencies that aren't included in the bundle have the name false
           if (name) {
-            makeModuleMetaEntry(name);
-            moduleMeta[name].parents.push(row.file);
+            makeModuleMetaEntry(fileKey(name));
+            moduleMeta[fileKey(name)].parents.push(fileKey(row.file));
           }
         });
       }
@@ -139,12 +145,12 @@ module.exports = function(bundle, opts) {
       if (row.file === hmrManagerFilename) {
         next(null, row);
       } else {
-        var hash = moduleMeta[row.file].hash = hashSource(row.source);
+        var hash = moduleMeta[fileKey(row.file)].hash = hashSource(row.source);
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
           row.source = transformCache[row.file].transformedSource;
         } else {
           var header = '_hmr['+JSON.stringify(bundleKey)+
-            '].initModule('+JSON.stringify(row.file)+', module);\n(function(){\n';
+            '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
           var footer = '\n}).call(this, arguments);\n';
 
           var inputMapCV = convert.fromSource(row.source);
@@ -153,7 +159,7 @@ module.exports = function(bundle, opts) {
             inputMap = inputMapCV.toObject();
             row.source = convert.removeComments(row.source);
           } else {
-            inputMap = makeIdentitySourceMap(row.source, row.file);
+            inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
           }
 
           var node = new sm.SourceNode(null, null, null, [
@@ -178,7 +184,7 @@ module.exports = function(bundle, opts) {
     bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
       if (row.file !== hmrManagerFilename) {
         // row.id used when fullPaths flag is used
-        moduleMeta[row.file].index = has(row, 'index') ? row.index : row.id;
+        moduleMeta[fileKey(row.file)].index = has(row, 'index') ? row.index : row.id;
         next(null, row);
       } else {
         managerRow = row;
