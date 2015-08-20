@@ -2,9 +2,9 @@
 
 This an implementation of Webpack's [Hot Module Replacement
 API](http://webpack.github.io/docs/hot-module-replacement.html) as a plugin for
-Browserify. This project seems to work, but it is still in development and
-is likely under-documented and under-tested at the moment. Let me know how it
-works for you!
+Browserify. This project seems to work in many cases, but it is still early in
+development and is likely under-documented and under-tested at the moment. Let
+me know how it works for you!
 
 ## Quick Example
 
