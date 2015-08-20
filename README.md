@@ -67,8 +67,12 @@ if more control over the timing of the reloads is desired.
 
 ## TODO and gotchas
 
-* more tests
-* make a Browserify-compatible react-hot-loader transform
+* Make a Browserify-compatible react-hot-loader transform
+* Maybe integrate an optional websocket-compatible webserver which can remove
+  the need for polling, and transmit just the changed modules.
+* There are known bugs currently where changes to modules without update
+  accepters can cause the updates to bubble up to the entry and cause many
+  modules to be reloaded incorrectly.
 * Only one browserify-hmr built script can be active in a javascript context at
   once right now because they would all use the same global to synchronize
   state. We should make it so the plugin takes an option to allow a named
