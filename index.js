@@ -30,8 +30,8 @@ var readManagerTemplate = _.once(function() {
   });
 });
 
-var validUpdateModes = ['xhr', 'fs'];
-var updateModesNeedingUrl = ['xhr'];
+var validUpdateModes = ['ajax', 'fs'];
+var updateModesNeedingUrl = ['ajax'];
 
 function makeIdentitySourceMap(content, resourcePath) {
   var map = new sm.SourceMapGenerator();
@@ -54,10 +54,19 @@ function makeIdentitySourceMap(content, resourcePath) {
 
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
-  var updateMode = opts.mode||opts.m||'xhr';
+  var updateMode = opts.mode||opts.m||'ajax';
   var updateUrl = opts.url||opts.u||null;
-  var updateCacheBust = Boolean(has(opts, 'cacheBust') ? opts.cacheBust : has(opts, 'b') ? opts.b : true);
+
+  var updateCacheBust = (function(){
+    var value = has(opts, 'cacheBust') ? opts.cacheBust : has(opts, 'b') ? opts.b : true;
+    return Boolean(value && value !== 'false');
+  })();
   var bundleKey = opts.key || updateMode+':'+(updateUrl||bundle.argv.outfile);
+
+  if (updateMode === 'xhr') {
+    console.warn('Use update mode "ajax" instead of "xhr".');
+    updateMode = 'ajax';
+  }
 
   if (!_.includes(validUpdateModes, updateMode)) {
     throw new Error("Invalid mode "+updateMode);

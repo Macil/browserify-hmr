@@ -173,7 +173,7 @@
         }
         fs.readFile(localHmr.updateUrl || __filename, 'utf8', cb);
       },
-      xhr: function(cb) {
+      ajax: function(cb) {
         var xhr;
         try {
           xhr = new XMLHttpRequest();
