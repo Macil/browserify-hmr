@@ -55,6 +55,12 @@
     return output;
   }
 
+  function emitError(err) {
+    setTimeout(function() {
+      throw err;
+    }, 0);
+  }
+
   var moduleIndexesToNames = {};
   for (name in moduleMeta) {
     if (has(moduleMeta, name)) {
@@ -533,7 +539,7 @@
               try {
                 relevantUpdateHandlers[i].cb.call(null, acceptedUpdates);
               } catch(e) {
-                if (errCanWait) console.error(errCanWait);
+                if (errCanWait) emitError(errCanWait);
                 errCanWait = e;
               }
             }
@@ -546,7 +552,7 @@
                 if (obj.cb) {
                   obj.cb.call(null, e);
                 } else {
-                  if (errCanWait) console.error(errCanWait);
+                  if (errCanWait) emitError(errCanWait);
                   errCanWait = e;
                 }
               }
