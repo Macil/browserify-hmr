@@ -6,6 +6,7 @@
   var updateMode = null/*!^^updateMode*/;
   var updateCacheBust = null/*!^^updateCacheBust*/;
   var bundleKey = null/*!^^bundleKey*/;
+  var sioPath = null/*!^^sioPath*/;
 
   var name, i, len;
 
@@ -383,6 +384,10 @@
               cb(new Error("module.hot.check can only be called while status is idle"));
               return;
             }
+            if (updateMode === 'websocket') {
+              cb(new Error("module.hot.check can't be used when update mode is websocket"));
+              return;
+            }
 
             localHmr.setStatus('check');
             reloadAndRunScript(function(err, expectUpdate) {
@@ -580,6 +585,31 @@
       }
     };
     global._hmr[bundleKey] = localHmr;
+
+    if (updateMode === 'websocket') {
+      var io = require(sioPath);
+      var socket = io(updateUrl);
+      var isAcceptingMessages = false;
+      socket.on('connect', function() {
+        isAcceptingMessages = false;
+        var syncMsg = mapValues(runtimeModuleInfo, function(value, name) {
+          return {
+            hash: value.hash
+          };
+        });
+        socket.emit('sync', syncMsg);
+      });
+      socket.on('sync confirm', function() {
+        isAcceptingMessages = true;
+      });
+      socket.on('new modules', function(msg) {
+        // Make sure we don't accept new modules before we've synced ourselves.
+        if (!isAcceptingMessages) return;
+
+        console.log('got some modules', msg);
+      });
+    }
+
     for (i=0, len=originalEntries.length; i<len; i++) {
       require(originalEntries[i]);
     }

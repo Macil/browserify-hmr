@@ -30,7 +30,7 @@ var readManagerTemplate = _.once(function() {
   });
 });
 
-var validUpdateModes = ['ajax', 'fs'];
+var validUpdateModes = ['websocket', 'ajax', 'fs'];
 var updateModesNeedingUrl = ['ajax'];
 
 function makeIdentitySourceMap(content, resourcePath) {
@@ -62,7 +62,7 @@ function boolOpt(value) {
 
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
-  var updateMode = readOpt(opts, 'mode', 'm', 'ajax');
+  var updateMode = readOpt(opts, 'mode', 'm', 'websocket');
   if (updateMode === 'xhr') {
     console.warn('Use update mode "ajax" instead of "xhr".');
     updateMode = 'ajax';
@@ -71,6 +71,21 @@ module.exports = function(bundle, opts) {
   var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', true));
   var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+(updateUrl||bundle.argv.outfile));
 
+  var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
+
+  var io = null;
+  var sioPath = null;
+  if (updateMode === 'websocket') {
+    if (!updateUrl) updateUrl = 'http://localhost:3123';
+
+    var m = /:\/\/([^\/:]+)(?::(\d+))?/.exec(updateUrl);
+    if (!m) throw new Error("Failed to parse update url");
+    var hostname = m[1];
+    var port = m[2] ? +m[2] : 80;
+
+    sioPath = path.relative(basedir, require.resolve('socket.io-client'));
+  }
+
   if (!_.includes(validUpdateModes, updateMode)) {
     throw new Error("Invalid mode "+updateMode);
   }
@@ -78,7 +93,65 @@ module.exports = function(bundle, opts) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
 
-  var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
+  var currentModuleData = {};
+
+  var runServer = _.once(function() {
+    var app = require('express')();
+    var server = require('http').Server(app);
+    io = require('socket.io')(server);
+    io.on('connection', function(socket) {
+      socket.on('sync', function(syncMsg) {
+        console.log('user connected, syncing');
+        var newModuleData = _.chain(currentModuleData)
+          .pairs()
+          .filter(function(pair) {
+            return !has(syncMsg, pair[0]) || syncMsg[pair[0]].hash !== pair[1].hash;
+          })
+          .zipObject()
+          .value();
+        var removedModules = _.chain(syncMsg)
+          .keys()
+          .filter(function(name) {
+            return !has(currentModuleData, name);
+          })
+          .value();
+        socket.emit('sync confirm', null);
+        if (Object.keys(newModuleData).length || removedModules.length)
+          socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
+      });
+    });
+    server.listen(port, hostname, function() {
+      console.log('listening on '+hostname+':'+port);
+    });
+  });
+
+  function setNewModuleData(moduleData) {
+    if (updateMode !== 'websocket') return;
+    runServer();
+    var newModuleData = _.chain(moduleData)
+      .pairs()
+      .filter(function(pair) {
+        return pair[1].isNew;
+      })
+      .map(function(pair) {
+        return [pair[0], {
+          hash: pair[1].hash,
+          source: pair[1].source,
+          parents: pair[1].parents
+        }];
+      })
+      .zipObject()
+      .value();
+    var removedModules = _.chain(currentModuleData)
+      .keys()
+      .filter(function(name) {
+        return !has(moduleData, name);
+      })
+      .value();
+    if (Object.keys(newModuleData).length || removedModules.length)
+      io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
+    currentModuleData = moduleData;
+  }
 
   function fileKey(filename) {
     return path.relative(basedir, filename);
@@ -99,7 +172,7 @@ module.exports = function(bundle, opts) {
         next(null, row);
       }
     }, function(next) {
-      var source = originalEntries.map(function(name) {
+      var source = [sioPath].filter(Boolean).concat(originalEntries).map(function(name) {
         return 'require('+JSON.stringify(name)+');\n';
       }).join('');
 
@@ -144,14 +217,22 @@ module.exports = function(bundle, opts) {
       next(null, row);
     }));
 
+    var moduleData = {};
+    var newTransformCache = {};
+
     bundle.pipeline.get('syntax').push(through.obj(function(row, enc, next) {
       if (row.file === hmrManagerFilename) {
         next(null, row);
       } else {
         var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
+        var originalSource = row.source;
+        var isNew;
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
+          isNew = false;
           row.source = transformCache[row.file].transformedSource;
+          newTransformCache[row.file] = transformCache[row.file];
         } else {
+          isNew = true;
           var header = '_hmr['+JSON.stringify(bundleKey)+
             '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
           var footer = '\n}).call(this, arguments);\n';
@@ -174,13 +255,25 @@ module.exports = function(bundle, opts) {
           var result = node.toStringWithSourceMap();
           row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
 
-          transformCache[row.file] = {
+          newTransformCache[row.file] = {
             hash: hash,
             transformedSource: row.source
           };
         }
+        if (updateMode === 'websocket') {
+          moduleData[fileKey(row.file)] = {
+            isNew: isNew,
+            hash: hash,
+            source: originalSource,
+            parents: moduleMeta[fileKey(row.file)].parents
+          };
+        }
         next(null, row);
       }
+    }, function(done) {
+      transformCache = newTransformCache;
+      setNewModuleData(moduleData);
+      done(null);
     }));
 
     var managerRow = null;
@@ -202,7 +295,8 @@ module.exports = function(bundle, opts) {
           .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
           .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
           .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
-          .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey));
+          .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
+          .replace('null/*!^^sioPath*/', JSON.stringify(sioPath));
         self.push(managerRow);
       }).then(done, done);
     }));
