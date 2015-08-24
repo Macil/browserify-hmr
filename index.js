@@ -178,9 +178,9 @@ module.exports = function(bundle, opts) {
         return 'require('+JSON.stringify(name)+');\n';
       }).join('');
 
-      // Put the hmr file name in the same directory as an entry file in order
-      // to prevent this: https://github.com/babel/babelify/issues/85
-      hmrManagerFilename = path.join(path.dirname(originalEntries[0]), '__hmr_manager.js');
+      // Put the hmr file name in basedir to prevent this:
+      // https://github.com/babel/babelify/issues/85
+      hmrManagerFilename = path.join(basedir, '__hmr_manager.js');
       this.push({
         entry: true,
         expose: false,
