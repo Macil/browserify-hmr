@@ -60,6 +60,16 @@ function boolOpt(value) {
   return Boolean(value && value !== 'false');
 }
 
+function delay(n) {
+  return new RSVP.Promise(function(resolve, reject) {
+    setTimeout(resolve, n);
+  });
+}
+
+function log() {
+  console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
+}
+
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
   var updateMode = readOpt(opts, 'mode', 'm', 'websocket');
@@ -101,7 +111,7 @@ module.exports = function(bundle, opts) {
     io = require('socket.io')(server);
     io.on('connection', function(socket) {
       socket.on('sync', function(syncMsg) {
-        console.log('[HMR] User connected, syncing');
+        log('User connected, syncing');
         var newModuleData = _.chain(currentModuleData)
           .pairs()
           .filter(function(pair) {
@@ -121,7 +131,7 @@ module.exports = function(bundle, opts) {
       });
     });
     server.listen(port, hostname, function() {
-      console.log('[HMR] Listening on '+hostname+':'+port);
+      log('Listening on '+hostname+':'+port);
     });
   });
 
@@ -150,8 +160,10 @@ module.exports = function(bundle, opts) {
         return !has(moduleData, name);
       })
       .value();
-    if (Object.keys(newModuleData).length || removedModules.length)
+    if (Object.keys(newModuleData).length || removedModules.length) {
+      log('Emitting updates');
       io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
+    }
     currentModuleData = moduleData;
   }
 
@@ -222,6 +234,7 @@ module.exports = function(bundle, opts) {
     var moduleData = {};
     var newTransformCache = {};
     var managerRow = null;
+    var rowBuffer = [];
 
     if (bundle.pipeline.get('dedupe').length > 1) {
       console.warn("[HMR] Warning: other plugins have added dedupe transforms. This may interfere.");
@@ -282,8 +295,14 @@ module.exports = function(bundle, opts) {
             parents: moduleMeta[fileKey(row.file)].parents,
             deps: row.indexDeps || row.deps
           };
+
+          // Buffer everything so we can get the websocket stuff done sooner
+          // without being slowed down by the final bundling.
+          rowBuffer.push(row);
+          next(null);
+        } else {
+          next(null, row);
         }
-        next(null, row);
       }
     }, function(done) {
       var self = this;
@@ -291,7 +310,16 @@ module.exports = function(bundle, opts) {
       transformCache = newTransformCache;
       setNewModuleData(moduleData);
 
-      readManagerTemplate().then(function(mgrTemplate) {
+      RSVP.Promise.all([
+        readManagerTemplate(),
+        delay(updateMode === 'websocket' ? 5000 : 0)
+      ]).then(function(results) {
+        var mgrTemplate = results[0];
+
+        rowBuffer.forEach(function(row) {
+          self.push(row);
+        });
+
         managerRow.source = mgrTemplate
           .replace('null/*!^^moduleMeta*/', JSON.stringify(moduleMeta))
           .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
