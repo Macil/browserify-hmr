@@ -120,3 +120,5 @@ if (module.hot) {
 * There are known bugs currently where changes to modules without update
   accepters can cause the updates to bubble up to the entry and cause many
   modules to be reloaded incorrectly.
+* The client code is a bit of a mess. It should be refactored and have many
+  smaller unit tests made.

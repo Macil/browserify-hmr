@@ -1,6 +1,7 @@
 'use strict';
 
 var path = require('path');
+var cproc = require('child_process');
 var through = require('through2');
 var convert = require('convert-source-map');
 var sm = require('source-map');
@@ -8,10 +9,7 @@ var crypto = require('crypto');
 var fs = require('fs');
 var _ = require('lodash');
 var RSVP = require('rsvp');
-
-function has(object, propName) {
-  return Object.prototype.hasOwnProperty.call(object, propName);
-}
+var has = require('./has');
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -60,16 +58,6 @@ function boolOpt(value) {
   return Boolean(value && value !== 'false');
 }
 
-function delay(n) {
-  return new RSVP.Promise(function(resolve, reject) {
-    setTimeout(resolve, n);
-  });
-}
-
-function log() {
-  console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
-}
-
 module.exports = function(bundle, opts) {
   if (!opts) opts = {};
   var updateMode = readOpt(opts, 'mode', 'm', 'websocket');
@@ -83,7 +71,6 @@ module.exports = function(bundle, opts) {
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
 
-  var io = null;
   var sioPath = null;
   if (updateMode === 'websocket') {
     if (!updateUrl) updateUrl = 'http://localhost:3123';
@@ -103,40 +90,29 @@ module.exports = function(bundle, opts) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
 
-  var currentModuleData = {};
-
+  var server;
+  var nextServerConfirm = RSVP.defer();
   var runServer = _.once(function() {
-    var app = require('express')();
-    var server = require('http').Server(app);
-    io = require('socket.io')(server);
-    io.on('connection', function(socket) {
-      socket.on('sync', function(syncMsg) {
-        log('User connected, syncing');
-        var newModuleData = _.chain(currentModuleData)
-          .pairs()
-          .filter(function(pair) {
-            return !has(syncMsg, pair[0]) || syncMsg[pair[0]].hash !== pair[1].hash;
-          })
-          .zipObject()
-          .value();
-        var removedModules = _.chain(syncMsg)
-          .keys()
-          .filter(function(name) {
-            return !has(currentModuleData, name);
-          })
-          .value();
-        socket.emit('sync confirm', null);
-        if (Object.keys(newModuleData).length || removedModules.length)
-          socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-      });
+    server = cproc.fork(__dirname+'/socket-server.js');
+    server.on('message', function(msg) {
+      if (msg.type === 'confirmNewModuleData') {
+        nextServerConfirm.resolve();
+        nextServerConfirm = RSVP.defer();
+      } else {
+        console.warn('[HMR builder] Unknown message type from server:', msg.type);
+      }
     });
-    server.listen(port, hostname, function() {
-      log('Listening on '+hostname+':'+port);
+    server.send({
+      type: 'config',
+      hostname: hostname,
+      port: port
     });
   });
 
+  var currentModuleData = {};
+
   function setNewModuleData(moduleData) {
-    if (updateMode !== 'websocket') return;
+    if (updateMode !== 'websocket') return RSVP.Promise.resolve();
     runServer();
     var newModuleData = _.chain(moduleData)
       .pairs()
@@ -160,11 +136,13 @@ module.exports = function(bundle, opts) {
         return !has(moduleData, name);
       })
       .value();
-    if (Object.keys(newModuleData).length || removedModules.length) {
-      log('Emitting updates');
-      io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-    }
     currentModuleData = moduleData;
+    server.send({
+      type: 'setNewModuleData',
+      newModuleData: newModuleData,
+      removedModules: removedModules
+    });
+    return nextServerConfirm.promise;
   }
 
   function fileKey(filename) {
@@ -312,14 +290,9 @@ module.exports = function(bundle, opts) {
       var self = this;
 
       transformCache = newTransformCache;
-      setNewModuleData(moduleData);
-
-      RSVP.Promise.all([
-        readManagerTemplate(),
-        delay(updateMode === 'websocket' ? 5000 : 0)
-      ]).then(function(results) {
-        var mgrTemplate = results[0];
-
+      setNewModuleData(moduleData).then(function() {
+        return readManagerTemplate();
+      }).then(function(mgrTemplate) {
         rowBuffer.forEach(function(thunk) {
           self.push(thunk());
         });
