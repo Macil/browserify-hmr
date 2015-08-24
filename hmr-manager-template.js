@@ -1,5 +1,8 @@
 (function(global, _main, moduleDefs, cachedModules, _entries) {
   'use strict';
+  // This is the client code for Browserify-HMR. It's currently all in one file
+  // (besides the socket.io-client) because it needs to define some things
+  // before require is called.
   var moduleMeta = null/*!^^moduleMeta*/;
   var originalEntries = null/*!^^originalEntries*/;
   var updateUrl = null/*!^^updateUrl*/;
@@ -40,6 +43,13 @@
     }
     return output;
   }
+  function zipObject(array) {
+    var obj = {};
+    forEach(array, function(value) {
+      obj[value[0]] = value[1];
+    });
+    return obj;
+  }
   function forOwn(object, fn) {
     for (var key in object) {
       if (has(object, key))
@@ -55,6 +65,12 @@
     }
     return output;
   }
+  function assign(dest, source) {
+    forOwn(source, function(value, key) {
+      dest[key] = value;
+    });
+    return dest;
+  }
 
   function emitError(err) {
     setTimeout(function() {
@@ -62,12 +78,15 @@
     }, 0);
   }
 
-  var moduleIndexesToNames = {};
-  for (name in moduleMeta) {
-    if (has(moduleMeta, name)) {
-      moduleIndexesToNames[moduleMeta[name].index] = name;
-    }
+  function makeModuleIndexesToNames(moduleMeta) {
+    var moduleIndexesToNames = {};
+    forOwn(moduleMeta, function(value, name) {
+      moduleIndexesToNames[value.index] = name;
+    });
+    return moduleIndexesToNames;
   }
+
+  var moduleIndexesToNames = makeModuleIndexesToNames(moduleMeta);
 
   var console = global.console ? global.console : {
     error: function(){}, log: function() {}
@@ -143,6 +162,13 @@
           return self.has(value);
         });
       }
+    };
+    StrSet.prototype.toArray = function() {
+      var arr = [];
+      this.forEach(function(value) {
+        arr.push(value);
+      });
+      return arr;
     };
 
     var runtimeModuleInfo = {};
@@ -284,6 +310,202 @@
       return outdated;
     };
 
+    var moduleHotCheck = function(autoApply, cb) {
+      if (typeof autoApply === 'function') {
+        cb = autoApply;
+        autoApply = false;
+      }
+      if (!cb) {
+        throw new Error("module.hot.check callback parameter required");
+      }
+      if (localHmr.status !== 'idle') {
+        cb(new Error("module.hot.check can only be called while status is idle"));
+        return;
+      }
+      if (updateMode === 'websocket') {
+        cb(new Error("module.hot.check can't be used when update mode is websocket"));
+        return;
+      }
+
+      localHmr.setStatus('check');
+      reloadAndRunScript(function(err, expectUpdate) {
+        if (err || !expectUpdate) {
+          localHmr.setStatus('idle');
+          cb(err, null);
+          return;
+        }
+        var outdatedModules = getOutdatedModules();
+        if (outdatedModules.length === 0) {
+          localHmr.setStatus('idle');
+          cb(null, null);
+        } else {
+          localHmr.setStatus('ready');
+          if (autoApply) {
+            moduleHotApply(autoApply, cb);
+          } else {
+            cb(null, outdatedModules);
+          }
+        }
+      });
+    };
+
+    var moduleHotApply = function(options, cb) {
+      if (typeof options === 'function') {
+        cb = options;
+        options = null;
+      }
+      if (!cb) {
+        throw new Error("module.hot.apply callback parameter required");
+      }
+      var ignoreUnaccepted = !!(options && options.ignoreUnaccepted);
+      if (localHmr.status !== 'ready') {
+        cb(new Error("module.hot.apply can only be called while status is ready"));
+        return;
+      }
+
+      var outdatedModules = getOutdatedModules();
+      var isValueNotInOutdatedModules = function(value) {
+        return outdatedModules.indexOf(value) === -1;
+      };
+      var i, len;
+      var acceptedUpdates = filter(outdatedModules, function(name) {
+        if (has(runtimeModuleInfo, name)) {
+          if (
+            runtimeModuleInfo[name].decliners.some(isValueNotInOutdatedModules) ||
+            (
+              runtimeModuleInfo[name].accepters.size() === 0 &&
+              runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
+              runtimeModuleInfo[name].parents.some(isValueNotInOutdatedModules)
+            )
+          ) {
+            return false;
+          }
+        }
+        return true;
+      });
+      if (!ignoreUnaccepted && outdatedModules.length !== acceptedUpdates.length) {
+        localHmr.setStatus('idle');
+        cb(new Error("Some updates were declined"));
+        return;
+      }
+      var an;
+      for (i=0, len=acceptedUpdates.length; i<len; i++) {
+        an = acceptedUpdates[i];
+        if (has(runtimeModuleInfo, an)) {
+          runtimeModuleInfo[an].disposeData = {};
+          for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
+            try {
+              runtimeModuleInfo[an].disposeHandlers[j].call(null, runtimeModuleInfo[an].disposeData);
+            } catch(e) {
+              localHmr.setStatus('idle');
+              cb(e || new Error("Unknown dispose callback error"));
+              return;
+            }
+          }
+        }
+      }
+      var selfAccepters = [];
+      for (i=0, len=acceptedUpdates.length; i<len; i++) {
+        an = acceptedUpdates[i];
+        //jshint -W083
+        if (!has(runtimeModuleInfo, an)) {
+          // new modules
+          runtimeModuleInfo[an] = {
+            index: an,
+            hash: localHmr.newLoad.moduleMeta[name].hash,
+            parents: new StrSet(localHmr.newLoad.moduleMeta[name].parents),
+            module: null,
+            disposeData: null,
+            accepters: new StrSet(),
+            accepting: new StrSet(),
+            decliners: new StrSet(),
+            declining: new StrSet(),
+            selfAcceptCbs: [],
+            disposeHandlers: []
+          };
+        } else if (!has(localHmr.newLoad.moduleMeta, an)) {
+          // removed modules
+          delete cachedModules[runtimeModuleInfo[an].index];
+          delete runtimeModuleInfo[an];
+          continue;
+        } else {
+          // updated modules
+          runtimeModuleInfo[an].hash = localHmr.newLoad.moduleMeta[an].hash;
+          runtimeModuleInfo[an].parents = new StrSet(localHmr.newLoad.moduleMeta[an].parents);
+          runtimeModuleInfo[an].module = null;
+          runtimeModuleInfo[an].accepting.forEach(function(accepted) {
+            runtimeModuleInfo[accepted].accepters.del(an);
+          });
+          runtimeModuleInfo[an].accepting = new StrSet();
+          runtimeModuleInfo[an].declining.forEach(function(accepted) {
+            runtimeModuleInfo[accepted].decliners.del(an);
+          });
+          runtimeModuleInfo[an].declining = new StrSet();
+          forEach(runtimeModuleInfo[an].selfAcceptCbs, function(cb) {
+            selfAccepters.push({name: an, cb: cb});
+          });
+          runtimeModuleInfo[an].selfAcceptCbs = [];
+          runtimeModuleInfo[an].disposeHandlers = [];
+        }
+
+        moduleDefs[runtimeModuleInfo[an].index] = [
+          // module function
+          localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][0],
+          // module deps
+          mapValues(localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][1], function(depIndex, depRef) {
+            var depName = localHmr.newLoad.moduleIndexesToNames[depIndex];
+            if (has(localHmr.runtimeModuleInfo, depName)) {
+              return localHmr.runtimeModuleInfo[depName].index;
+            } else {
+              return depName;
+            }
+          })
+        ];
+        cachedModules[runtimeModuleInfo[an].index] = null;
+      }
+
+      // Update the accept handlers list and call the right ones
+      var errCanWait = null;
+      var updatedNames = new StrSet(acceptedUpdates);
+      var oldUpdateHandlers = localHmr.updateHandlers;
+      var relevantUpdateHandlers = [];
+      var newUpdateHandlers = [];
+      for (i=0, len=oldUpdateHandlers.length; i<len; i++) {
+        if (!updatedNames.has(oldUpdateHandlers[i].accepter)) {
+          newUpdateHandlers.push(oldUpdateHandlers[i]);
+        }
+        if (updatedNames.hasIntersection(oldUpdateHandlers[i].deps)) {
+          relevantUpdateHandlers.push(oldUpdateHandlers[i]);
+        }
+      }
+      localHmr.updateHandlers = newUpdateHandlers;
+      for (i=0, len=relevantUpdateHandlers.length; i<len; i++) {
+        try {
+          relevantUpdateHandlers[i].cb.call(null, acceptedUpdates);
+        } catch(e) {
+          if (errCanWait) emitError(errCanWait);
+          errCanWait = e;
+        }
+      }
+
+      // Call the self-accepting modules
+      forEach(selfAccepters, function(obj) {
+        try {
+          require(runtimeModuleInfo[obj.name].index);
+        } catch(e) {
+          if (obj.cb) {
+            obj.cb.call(null, e);
+          } else {
+            if (errCanWait) emitError(errCanWait);
+            errCanWait = e;
+          }
+        }
+      });
+
+      localHmr.setStatus('idle');
+      cb(errCanWait, acceptedUpdates);
+    };
+
     var localHmr = {
       updateUrl: updateUrl,
       updateMode: updateMode,
@@ -372,200 +594,8 @@
           },
 
           // Management
-          check: function(autoApply, cb) {
-            if (typeof autoApply === 'function') {
-              cb = autoApply;
-              autoApply = false;
-            }
-            if (!cb) {
-              throw new Error("module.hot.check callback parameter required");
-            }
-            if (this.status() !== 'idle') {
-              cb(new Error("module.hot.check can only be called while status is idle"));
-              return;
-            }
-            if (updateMode === 'websocket') {
-              cb(new Error("module.hot.check can't be used when update mode is websocket"));
-              return;
-            }
-
-            localHmr.setStatus('check');
-            reloadAndRunScript(function(err, expectUpdate) {
-              if (err || !expectUpdate) {
-                localHmr.setStatus('idle');
-                cb(err, null);
-                return;
-              }
-              var outdatedModules = getOutdatedModules();
-              if (outdatedModules.length === 0) {
-                localHmr.setStatus('idle');
-                cb(null, null);
-              } else {
-                localHmr.setStatus('ready');
-                if (autoApply) {
-                  module.hot.apply(autoApply, cb);
-                } else {
-                  cb(null, outdatedModules);
-                }
-              }
-            });
-          },
-          apply: function(options, cb) {
-            if (typeof options === 'function') {
-              cb = options;
-              options = null;
-            }
-            if (!cb) {
-              throw new Error("module.hot.apply callback parameter required");
-            }
-            var ignoreUnaccepted = !!(options && options.ignoreUnaccepted);
-            if (this.status() !== 'ready') {
-              cb(new Error("module.hot.apply can only be called while status is ready"));
-              return;
-            }
-
-            var outdatedModules = getOutdatedModules();
-            var isValueNotInOutdatedModules = function(value) {
-              return outdatedModules.indexOf(value) === -1;
-            };
-            var i, len;
-            var acceptedUpdates = filter(outdatedModules, function(name) {
-              if (has(runtimeModuleInfo, name)) {
-                if (
-                  runtimeModuleInfo[name].decliners.some(isValueNotInOutdatedModules) ||
-                  (
-                    runtimeModuleInfo[name].accepters.size() === 0 &&
-                    runtimeModuleInfo[name].selfAcceptCbs.length === 0 &&
-                    runtimeModuleInfo[name].parents.some(isValueNotInOutdatedModules)
-                  )
-                ) {
-                  return false;
-                }
-              }
-              return true;
-            });
-            if (!ignoreUnaccepted && outdatedModules.length !== acceptedUpdates.length) {
-              localHmr.setStatus('idle');
-              cb(new Error("Some updates were declined"));
-              return;
-            }
-            var an;
-            for (i=0, len=acceptedUpdates.length; i<len; i++) {
-              an = acceptedUpdates[i];
-              if (has(runtimeModuleInfo, an)) {
-                runtimeModuleInfo[an].disposeData = {};
-                for (var j=0; j<runtimeModuleInfo[an].disposeHandlers.length; j++) {
-                  try {
-                    runtimeModuleInfo[an].disposeHandlers[j].call(null, runtimeModuleInfo[an].disposeData);
-                  } catch(e) {
-                    localHmr.setStatus('idle');
-                    cb(e || new Error("Unknown dispose callback error"));
-                    return;
-                  }
-                }
-              }
-            }
-            var selfAccepters = [];
-            for (i=0, len=acceptedUpdates.length; i<len; i++) {
-              an = acceptedUpdates[i];
-              //jshint -W083
-              if (!has(runtimeModuleInfo, an)) {
-                // new modules
-                runtimeModuleInfo[an] = {
-                  index: an,
-                  hash: localHmr.newLoad.moduleMeta[name].hash,
-                  parents: new StrSet(localHmr.newLoad.moduleMeta[name].parents),
-                  module: null,
-                  disposeData: null,
-                  accepters: new StrSet(),
-                  accepting: new StrSet(),
-                  decliners: new StrSet(),
-                  declining: new StrSet(),
-                  selfAcceptCbs: [],
-                  disposeHandlers: []
-                };
-              } else if (!has(localHmr.newLoad.moduleMeta, an)) {
-                // removed modules
-                delete cachedModules[runtimeModuleInfo[an].index];
-                delete runtimeModuleInfo[an];
-                continue;
-              } else {
-                // updated modules
-                runtimeModuleInfo[an].hash = localHmr.newLoad.moduleMeta[an].hash;
-                runtimeModuleInfo[an].parents = new StrSet(localHmr.newLoad.moduleMeta[an].parents);
-                runtimeModuleInfo[an].module = null;
-                runtimeModuleInfo[an].accepting.forEach(function(accepted) {
-                  runtimeModuleInfo[accepted].accepters.del(an);
-                });
-                runtimeModuleInfo[an].accepting = new StrSet();
-                runtimeModuleInfo[an].declining.forEach(function(accepted) {
-                  runtimeModuleInfo[accepted].decliners.del(an);
-                });
-                runtimeModuleInfo[an].declining = new StrSet();
-                forEach(runtimeModuleInfo[an].selfAcceptCbs, function(cb) {
-                  selfAccepters.push({name: an, cb: cb});
-                });
-                runtimeModuleInfo[an].selfAcceptCbs = [];
-                runtimeModuleInfo[an].disposeHandlers = [];
-              }
-
-              moduleDefs[runtimeModuleInfo[an].index] = [
-                // module function
-                localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][0],
-                // module deps
-                mapValues(localHmr.newLoad.moduleDefs[localHmr.newLoad.moduleMeta[an].index][1], function(depIndex, depRef) {
-                  var depName = localHmr.newLoad.moduleIndexesToNames[depIndex];
-                  if (has(localHmr.runtimeModuleInfo, depName)) {
-                    return localHmr.runtimeModuleInfo[depName].index;
-                  } else {
-                    return depName;
-                  }
-                })
-              ];
-              cachedModules[runtimeModuleInfo[an].index] = null;
-            }
-
-            // Update the accept handlers list and call the right ones
-            var errCanWait = null;
-            var updatedNames = new StrSet(acceptedUpdates);
-            var oldUpdateHandlers = localHmr.updateHandlers;
-            var relevantUpdateHandlers = [];
-            var newUpdateHandlers = [];
-            for (i=0, len=oldUpdateHandlers.length; i<len; i++) {
-              if (!updatedNames.has(oldUpdateHandlers[i].accepter)) {
-                newUpdateHandlers.push(oldUpdateHandlers[i]);
-              }
-              if (updatedNames.hasIntersection(oldUpdateHandlers[i].deps)) {
-                relevantUpdateHandlers.push(oldUpdateHandlers[i]);
-              }
-            }
-            localHmr.updateHandlers = newUpdateHandlers;
-            for (i=0, len=relevantUpdateHandlers.length; i<len; i++) {
-              try {
-                relevantUpdateHandlers[i].cb.call(null, acceptedUpdates);
-              } catch(e) {
-                if (errCanWait) emitError(errCanWait);
-                errCanWait = e;
-              }
-            }
-
-            // Call the self-accepting modules
-            forEach(selfAccepters, function(obj) {
-              try {
-                require(runtimeModuleInfo[obj.name].index);
-              } catch(e) {
-                if (obj.cb) {
-                  obj.cb.call(null, e);
-                } else {
-                  if (errCanWait) emitError(errCanWait);
-                  errCanWait = e;
-                }
-              }
-            });
-
-            localHmr.setStatus('idle');
-            cb(errCanWait, acceptedUpdates);
-          },
+          check: moduleHotCheck,
+          apply: moduleHotApply,
           status: function(cb) {
             if (cb) {
               return this.addStatusHandler(cb);
@@ -599,15 +629,114 @@
         });
         socket.emit('sync', syncMsg);
       });
+      var isUpdating = false;
+      var queuedUpdateMessages = [];
       socket.on('sync confirm', function() {
+        console.log('[HMR] Websocket connection successful.');
         isAcceptingMessages = true;
+        queuedUpdateMessages = [];
       });
-      socket.on('new modules', function(msg) {
+      socket.on('disconnect', function() {
+        console.log('[HMR] Websocket connection lost.');
+      });
+      var acceptNewModules = function(msg) {
         // Make sure we don't accept new modules before we've synced ourselves.
         if (!isAcceptingMessages) return;
+        if (isUpdating) {
+          queuedUpdateMessages.push(msg);
+          return;
+        }
+        // Take the message and create a localHmr.newLoad value as if the
+        // bundle had been re-executed, then call moduleHotApply.
+        isUpdating = true;
 
-        console.log('got some modules', msg);
-      });
+        // random id so we can make the normally unnamed args have random names
+        var rid = String(Math.random()).replace(/[^0-9]/g, '');
+
+        var newModuleDefs = localHmr.newLoad ? localHmr.newLoad.moduleDefs : assign({}, moduleDefs);
+        var newModuleMeta = localHmr.newLoad ?
+          localHmr.newLoad.moduleMeta : mapValues(runtimeModuleInfo, function(value, key) {
+            return {
+              index: value.index,
+              hash: value.hash,
+              parents: value.parents.toArray()
+            };
+          });
+        forOwn(msg.newModuleData, function(value, key) {
+          newModuleMeta[key] = {
+            index: value.index,
+            hash: value.hash,
+            parents: value.parents
+          };
+        });
+        forEach(msg.removedModules, function(removedName) {
+          delete newModuleDefs[runtimeModuleInfo[removedName].index];
+          delete newModuleMeta[removedName];
+        });
+        var newModuleIndexesToNames = makeModuleIndexesToNames(newModuleMeta);
+        forOwn(msg.newModuleData, function(value, key) {
+          // this part needs to run after newModuleMeta and
+          // newModuleIndexesToNames are populated.
+          var newModuleFunction = (function() {
+            var fn;
+            //jshint evil:true
+            if (typeof __filename !== 'undefined' && typeof __dirname !== 'undefined') {
+              fn = new Function('require', 'module', 'exports', '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, '__filename', '__dirname', value.source);
+              return function(require, module, exports, _u1, _u2, _u3, _u4) {
+                _hmr[bundleKey].initModule(key, module);
+                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4, __filename, __dirname);
+              };
+            } else {
+              fn = new Function('require', 'module', 'exports',  '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, value.source);
+              return function(require, module, exports, _u1, _u2, _u3, _u4) {
+                _hmr[bundleKey].initModule(key, module);
+                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4);
+              };
+            }
+          })();
+
+          newModuleDefs[newModuleMeta[key].index] = [
+            // module function
+            newModuleFunction,
+            // module deps
+            mapValues(value.deps, function(depIndex, depRef) {
+              var depName = newModuleIndexesToNames[depIndex];
+              if (has(newModuleMeta, depName)) {
+                return newModuleMeta[depName].index;
+              } else {
+                return depName;
+              }
+            })
+          ];
+        });
+        localHmr.newLoad = {
+          moduleDefs: newModuleDefs,
+          moduleMeta: newModuleMeta,
+          moduleIndexesToNames: newModuleIndexesToNames
+        };
+        localHmr.setStatus('ready');
+        var outdatedModules = getOutdatedModules();
+        moduleHotApply({ignoreUnaccepted: true}, function(err, updatedNames) {
+          if (err) {
+            console.error('[HMR] Error applying update', err);
+          }
+          if (updatedNames) {
+            console.log('[HMR] Updated modules', updatedNames);
+            if (outdatedModules.length !== updatedNames.length) {
+              var notUpdatedNames = filter(outdatedModules, function(name) {
+                return updatedNames.indexOf(name) === -1;
+              });
+              console.log('[HMR] Some modules were not updated', notUpdatedNames);
+            }
+          }
+          isUpdating = false;
+          var queuedMsg;
+          while ((queuedMsg = queuedUpdateMessages.shift())) {
+            acceptNewModules(queuedMsg);
+          }
+        });
+      };
+      socket.on('new modules', acceptNewModules);
     }
 
     for (i=0, len=originalEntries.length; i<len; i++) {

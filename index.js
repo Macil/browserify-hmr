@@ -135,9 +135,11 @@ module.exports = function(bundle, opts) {
       })
       .map(function(pair) {
         return [pair[0], {
+          index: pair[1].index,
           hash: pair[1].hash,
           source: pair[1].source,
-          parents: pair[1].parents
+          parents: pair[1].parents,
+          deps: pair[1].deps
         }];
       })
       .zipObject()
@@ -219,11 +221,22 @@ module.exports = function(bundle, opts) {
 
     var moduleData = {};
     var newTransformCache = {};
+    var managerRow = null;
 
-    bundle.pipeline.get('syntax').push(through.obj(function(row, enc, next) {
+    if (bundle.pipeline.get('dedupe').length > 1) {
+      console.warn("[HMR] Warning: other plugins have added dedupe transforms. This may interfere.");
+    }
+    // Disable dedupe transforms because it screws with our change tracking.
+    bundle.pipeline.splice('dedupe', 1, through.obj());
+
+    bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
       if (row.file === hmrManagerFilename) {
-        next(null, row);
+        managerRow = row;
+        next(null);
       } else {
+        // row.id used when fullPaths flag is used
+        moduleMeta[fileKey(row.file)].index = has(row, 'index') ? row.index : row.id;
+
         var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
         var originalSource = row.source;
         var isNew;
@@ -263,31 +276,21 @@ module.exports = function(bundle, opts) {
         if (updateMode === 'websocket') {
           moduleData[fileKey(row.file)] = {
             isNew: isNew,
+            index: moduleMeta[fileKey(row.file)].index,
             hash: hash,
             source: originalSource,
-            parents: moduleMeta[fileKey(row.file)].parents
+            parents: moduleMeta[fileKey(row.file)].parents,
+            deps: row.indexDeps
           };
         }
         next(null, row);
       }
     }, function(done) {
+      var self = this;
+
       transformCache = newTransformCache;
       setNewModuleData(moduleData);
-      done(null);
-    }));
 
-    var managerRow = null;
-    bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
-      if (row.file !== hmrManagerFilename) {
-        // row.id used when fullPaths flag is used
-        moduleMeta[fileKey(row.file)].index = has(row, 'index') ? row.index : row.id;
-        next(null, row);
-      } else {
-        managerRow = row;
-        next(null);
-      }
-    }, function(done) {
-      var self = this;
       readManagerTemplate().then(function(mgrTemplate) {
         managerRow.source = mgrTemplate
           .replace('null/*!^^moduleMeta*/', JSON.stringify(moduleMeta))
