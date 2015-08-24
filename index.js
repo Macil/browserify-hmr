@@ -80,7 +80,7 @@ module.exports = function(bundle, opts) {
     var hostname = m[1];
     var port = m[2] ? +m[2] : 80;
 
-    sioPath = path.relative(basedir, require.resolve('socket.io-client'));
+    sioPath = './'+path.relative(basedir, require.resolve('socket.io-client'));
   }
 
   if (!_.includes(validUpdateModes, updateMode)) {
