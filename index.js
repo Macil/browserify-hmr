@@ -101,7 +101,7 @@ module.exports = function(bundle, opts) {
     io = require('socket.io')(server);
     io.on('connection', function(socket) {
       socket.on('sync', function(syncMsg) {
-        console.log('user connected, syncing');
+        console.log('[HMR] User connected, syncing');
         var newModuleData = _.chain(currentModuleData)
           .pairs()
           .filter(function(pair) {
@@ -121,7 +121,7 @@ module.exports = function(bundle, opts) {
       });
     });
     server.listen(port, hostname, function() {
-      console.log('listening on '+hostname+':'+port);
+      console.log('[HMR] Listening on '+hostname+':'+port);
     });
   });
 
@@ -280,7 +280,7 @@ module.exports = function(bundle, opts) {
             hash: hash,
             source: originalSource,
             parents: moduleMeta[fileKey(row.file)].parents,
-            deps: row.indexDeps
+            deps: row.indexDeps || row.deps
           };
         }
         next(null, row);
