@@ -252,38 +252,42 @@ module.exports = function(bundle, opts) {
 
         var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
         var originalSource = row.source;
-        var isNew;
+        var isNew, thunk;
         if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
           isNew = false;
           row.source = transformCache[row.file].transformedSource;
           newTransformCache[row.file] = transformCache[row.file];
+          thunk = _.constant(row);
         } else {
           isNew = true;
-          var header = '_hmr['+JSON.stringify(bundleKey)+
-            '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
-          var footer = '\n}).apply(this, arguments);\n';
+          thunk = function() {
+            var header = '_hmr['+JSON.stringify(bundleKey)+
+              '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
+            var footer = '\n}).apply(this, arguments);\n';
 
-          var inputMapCV = convert.fromSource(row.source);
-          var inputMap;
-          if (inputMapCV) {
-            inputMap = inputMapCV.toObject();
-            row.source = convert.removeComments(row.source);
-          } else {
-            inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
-          }
+            var inputMapCV = convert.fromSource(row.source);
+            var inputMap;
+            if (inputMapCV) {
+              inputMap = inputMapCV.toObject();
+              row.source = convert.removeComments(row.source);
+            } else {
+              inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
+            }
 
-          var node = new sm.SourceNode(null, null, null, [
-            new sm.SourceNode(null, null, null, header),
-            sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
-            new sm.SourceNode(null, null, null, footer)
-          ]);
+            var node = new sm.SourceNode(null, null, null, [
+              new sm.SourceNode(null, null, null, header),
+              sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
+              new sm.SourceNode(null, null, null, footer)
+            ]);
 
-          var result = node.toStringWithSourceMap();
-          row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
+            var result = node.toStringWithSourceMap();
+            row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
 
-          newTransformCache[row.file] = {
-            hash: hash,
-            transformedSource: row.source
+            newTransformCache[row.file] = {
+              hash: hash,
+              transformedSource: row.source
+            };
+            return row;
           };
         }
         if (updateMode === 'websocket') {
@@ -298,10 +302,10 @@ module.exports = function(bundle, opts) {
 
           // Buffer everything so we can get the websocket stuff done sooner
           // without being slowed down by the final bundling.
-          rowBuffer.push(row);
+          rowBuffer.push(thunk);
           next(null);
         } else {
-          next(null, row);
+          next(null, thunk());
         }
       }
     }, function(done) {
@@ -316,8 +320,8 @@ module.exports = function(bundle, opts) {
       ]).then(function(results) {
         var mgrTemplate = results[0];
 
-        rowBuffer.forEach(function(row) {
-          self.push(row);
+        rowBuffer.forEach(function(thunk) {
+          self.push(thunk());
         });
 
         managerRow.source = mgrTemplate
