@@ -83,7 +83,7 @@ Options can be specified using the Browserify API too:
 var hmr = require('browserify-hmr');
 
 browserify().plugin(hmr, {
-  extensions: [".babel"]
+  mode: "fs"
 })
 ```
 
