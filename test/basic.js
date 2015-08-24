@@ -84,14 +84,14 @@ describe('browserify-hmr', function() {
         yield copy('./test/data/self-index.js', selfIndex);
         yield copy('./test/data/self-dep1.js', selfDep);
         yield run('./node_modules/.bin/browserify', [
-          '--node','-p','[','./index','-m','fs',']',selfIndex,'-o',selfBundle
+          '--node','-p','[','./index','-m','fs','-k','self',']',selfIndex,'-o',selfBundle
         ]);
       }),
       co(function*() {
         yield copy('./test/data/basic-index.js', basicIndex);
         yield copy('./test/data/basic-dep1.js', basicDep);
         yield run('./node_modules/.bin/browserify', [
-          '--node','-p','[','./index','-m','fs',']',basicIndex,'-o',basicBundle
+          '--node','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
         ]);
       })
     ]);
@@ -106,7 +106,7 @@ describe('browserify-hmr', function() {
         yield copy('./test/data/basic-dep2.js', basicDep);
         yield run('./node_modules/.bin/browserify', [
           // test --full-paths too
-          '--node','--full-paths','-p','[','./index','-m','fs',']',basicIndex,'-o',basicBundle
+          '--node','--full-paths','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
         ]);
       })
     ]);
