@@ -412,8 +412,8 @@
           // new modules
           runtimeModuleInfo[an] = {
             index: an,
-            hash: localHmr.newLoad.moduleMeta[name].hash,
-            parents: new StrSet(localHmr.newLoad.moduleMeta[name].parents),
+            hash: localHmr.newLoad.moduleMeta[an].hash,
+            parents: new StrSet(localHmr.newLoad.moduleMeta[an].parents),
             module: null,
             disposeData: null,
             accepters: new StrSet(),
