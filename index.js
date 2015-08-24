@@ -235,7 +235,7 @@ module.exports = function(bundle, opts) {
           isNew = true;
           var header = '_hmr['+JSON.stringify(bundleKey)+
             '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
-          var footer = '\n}).call(this, arguments);\n';
+          var footer = '\n}).apply(this, arguments);\n';
 
           var inputMapCV = convert.fromSource(row.source);
           var inputMap;
