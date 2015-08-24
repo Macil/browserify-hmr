@@ -1,4 +1,4 @@
 #!/bin/bash
-./node_modules/.bin/watchify -vdp [ browserify-hmr ] index.js -o bundle.js  &
+./node_modules/.bin/watchify -vd -t react-hot-transform -p browserify-hmr index.js -o bundle.js  &
 ./node_modules/.bin/http-server -c 1 -a localhost &
 wait

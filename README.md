@@ -15,7 +15,7 @@ npm i && npm start
 ```
 
 Open [http://localhost:8080/](http://localhost:8080/) and try updating
-`label.js`.
+`label.jsx` and `interval.js`.
 
 ## Usage
 
@@ -112,11 +112,18 @@ if (module.hot) {
 }
 ```
 
+## See Also
+
+* [react-hot-transform](https://github.com/AgentME/react-hot-transform)
+  automatically makes React code live-updatable.
+* [ud](https://github.com/AgentME/ud) and
+  [ud-kefir](https://github.com/AgentME/ud-kefir) are small simple utilities
+  for declaring data and code as live-updatable.
+
 ## Planned Work
 
 * Extend the API so the user can control the update mode and parameters at
   runtime.
-* Make a Browserify-compatible react-hot-loader transform
 * There are known bugs currently where changes to modules without update
   accepters can cause the updates to bubble up to the entry and cause many
   modules to be reloaded incorrectly.
