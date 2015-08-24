@@ -69,7 +69,7 @@ module.exports = function(bundle, opts) {
   }
   var updateUrl = readOpt(opts, 'url', 'u', null);
   var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', true));
-  var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+(updateUrl||bundle.argv.outfile));
+  var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+updateUrl);
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
 
