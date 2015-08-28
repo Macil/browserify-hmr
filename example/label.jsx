@@ -11,4 +11,4 @@ var Label = React.createClass({
     );
   }
 });
-module.exports = Label;
+export default Label;

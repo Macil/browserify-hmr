@@ -8,11 +8,6 @@
     "start": "./scripts/run",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "browserify": {
-    "transform": [
-      "babelify"
-    ]
-  },
   "devDependencies": {
     "browserify": "^11.0.1",
     "browserify-hmr": "^0.2.0",
@@ -24,7 +19,7 @@
     "babelify": "^6.2.0",
     "jquery": "^2.1.4",
     "react": "^0.13.3",
-    "react-hot-transform": "^1.0.0",
+    "react-hot-transform": "^1.0.1",
     "ud": "^1.0.3"
   }
 }

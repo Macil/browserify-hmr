@@ -1,6 +1,6 @@
 var $ = require('jquery');
 var React = require('react');
-var Label = require('./label.jsx');
+import Label from './label.jsx';
 require('./interval')();
 
 $(document).ready(() => {
