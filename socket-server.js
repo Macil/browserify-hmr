@@ -69,3 +69,6 @@ process.on('message', function(msg) {
     log('Unknow message type', msg.type);
   }
 });
+process.on('disconnect', function() {
+  process.exit(0);
+});
