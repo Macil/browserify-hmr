@@ -4,6 +4,7 @@ var path = require('path');
 var cproc = require('child_process');
 var through = require('through2');
 var convert = require('convert-source-map');
+var EventEmitter = require('events').EventEmitter;
 var sm = require('source-map');
 var crypto = require('crypto');
 var fs = require('fs');
@@ -70,6 +71,7 @@ module.exports = function(bundle, opts) {
   var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+updateUrl);
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
+  var em = new EventEmitter();
 
   var sioPath = null;
   if (updateMode === 'websocket') {
@@ -101,6 +103,9 @@ module.exports = function(bundle, opts) {
       } else {
         console.warn('[HMR builder] Unknown message type from server:', msg.type);
       }
+    });
+    server.on('disconnect', function() {
+      em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
     server.send({
       type: 'config',
@@ -312,4 +317,5 @@ module.exports = function(bundle, opts) {
   setupPipelineMods();
 
   bundle.on('reset', setupPipelineMods);
+  return em;
 };
