@@ -15,11 +15,13 @@
     ]
   },
   "devDependencies": {
-    "babel-plugin-react-transform": "^1.0.3",
+    "babel-plugin-react-transform": "^1.0.5",
     "browserify": "^11.1.0",
     "browserify-hmr": "^0.2.2",
     "http-server": "^0.8.0",
-    "react-transform-webpack-hmr": "^0.1.4",
+    "react-transform-catch-errors": "^1.0.0",
+    "react-transform-hmr": "^1.0.0",
+    "redbox-react": "^1.1.0",
     "watchify": "^3.4.0"
   },
   "dependencies": {
