@@ -62,7 +62,7 @@ browserify().plugin(hmr, {
 
 `m, mode` is a string which sets the update mode. "websocket" tells
 browserify-hmr to open a websocket connection to the plugin to listen for
-changes. "ajax" uses AJAX requests to donwload updates. "fs" uses the
+changes. "ajax" uses AJAX requests to download updates. "fs" uses the
 filesystem module and is suitable for Node use. Defaults to "websocket".
 
 `u, url` is a string which sets the update URL that the websocket connection or
