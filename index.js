@@ -10,6 +10,7 @@ var crypto = require('crypto');
 var fs = require('fs');
 var _ = require('lodash');
 var RSVP = require('rsvp');
+var readFile = RSVP.denodeify(fs.readFile);
 var has = require('./has');
 
 function hashStr(str) {
@@ -19,14 +20,7 @@ function hashStr(str) {
 }
 
 var readManagerTemplate = _.once(function() {
-  return new RSVP.Promise(function(resolve, reject) {
-    fs.readFile(path.join(__dirname, 'hmr-manager-template.js'), 'utf8', function(err, data) {
-      if (err)
-        reject(err);
-      else
-        resolve(data);
-    });
-  });
+  return readFile(path.join(__dirname, 'hmr-manager-template.js'), 'utf8');
 });
 
 var validUpdateModes = ['websocket', 'ajax', 'fs'];
@@ -69,6 +63,9 @@ module.exports = function(bundle, opts) {
   var updateUrl = readOpt(opts, 'url', 'u', null);
   var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', true));
   var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+updateUrl);
+  var cert = readOpt(opts, 'tlscert', 'C', null);
+  var key = readOpt(opts, 'tlskey', 'K', null);
+  var tlsoptions = opts.tlsoptions;
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
   var em = new EventEmitter();
@@ -107,10 +104,32 @@ module.exports = function(bundle, opts) {
     server.on('disconnect', function() {
       em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
-    server.send({
-      type: 'config',
-      hostname: hostname,
-      port: port
+    return new RSVP.Promise(function(resolve, reject) {
+      var readJobs = [];
+      if (cert) {
+        readJobs.push(readFile(cert, 'utf8').then(function(data) {
+          tlsoptions = tlsoptions || {};
+          tlsoptions.cert = data;
+        }));
+      }
+      if (key) {
+        readJobs.push(readFile(key, 'utf8').then(function(data) {
+          tlsoptions = tlsoptions || {};
+          tlsoptions.key = data;
+        }));
+      }
+      if (readJobs.length) {
+        resolve(RSVP.Promise.all(readJobs));
+      } else {
+        resolve();
+      }
+    }).then(function(){
+      server.send({
+        type: 'config',
+        hostname: hostname,
+        port: port,
+        tlsoptions: tlsoptions
+      });
     });
   });
 
@@ -118,36 +137,37 @@ module.exports = function(bundle, opts) {
 
   function setNewModuleData(moduleData) {
     if (updateMode !== 'websocket') return RSVP.Promise.resolve();
-    runServer();
-    var newModuleData = _.chain(moduleData)
-      .pairs()
-      .filter(function(pair) {
-        return pair[1].isNew;
-      })
-      .map(function(pair) {
-        return [pair[0], {
-          index: pair[1].index,
-          hash: pair[1].hash,
-          source: pair[1].source,
-          parents: pair[1].parents,
-          deps: pair[1].deps
-        }];
-      })
-      .zipObject()
-      .value();
-    var removedModules = _.chain(currentModuleData)
-      .keys()
-      .filter(function(name) {
-        return !has(moduleData, name);
-      })
-      .value();
-    currentModuleData = moduleData;
-    server.send({
-      type: 'setNewModuleData',
-      newModuleData: newModuleData,
-      removedModules: removedModules
+    return runServer().then(function() {
+      var newModuleData = _.chain(moduleData)
+        .pairs()
+        .filter(function(pair) {
+          return pair[1].isNew;
+        })
+        .map(function(pair) {
+          return [pair[0], {
+            index: pair[1].index,
+            hash: pair[1].hash,
+            source: pair[1].source,
+            parents: pair[1].parents,
+            deps: pair[1].deps
+          }];
+        })
+        .zipObject()
+        .value();
+      var removedModules = _.chain(currentModuleData)
+        .keys()
+        .filter(function(name) {
+          return !has(moduleData, name);
+        })
+        .value();
+      currentModuleData = moduleData;
+      server.send({
+        type: 'setNewModuleData',
+        newModuleData: newModuleData,
+        removedModules: removedModules
+      });
+      return nextServerConfirm.promise;
     });
-    return nextServerConfirm.promise;
   }
 
   function fileKey(filename) {

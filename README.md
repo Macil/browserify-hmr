@@ -61,9 +61,11 @@ browserify().plugin(hmr, {
 ```
 
 `m, mode` is a string which sets the update mode. "websocket" tells
-browserify-hmr to open a websocket connection to the plugin to listen for
-changes. "ajax" uses AJAX requests to download updates. "fs" uses the
-filesystem module and is suitable for Node use. Defaults to "websocket".
+browserify-hmr to open a connection to a websocket server hosted by the plugin
+to listen for changes. The websocket will be served over HTTP unless any of the
+tlskey, tlscert, or tlsoptions options are passed. "ajax" uses AJAX requests to
+download updates. "fs" uses the filesystem module and is suitable for Node use.
+Defaults to "websocket".
 
 `u, url` is a string which sets the update URL that the websocket connection or
 Browserify bundle is accessible at. In "websocket" mode, this defaults to
@@ -82,6 +84,14 @@ result in a performance improvement. Defaults to true.
 run within the same javascript environment, then each must have a unique bundle
 key. The bundle key defaults to a value created by combining the update mode
 and update url, so you generally don't need to worry about this option.
+
+`K, tlskey` is the path to the key file to use for HTTPS mode.
+
+`C, tlscert` is the path to the certificate file to use for HTTPS mode.
+
+`tlsoptions` is an object of options to pass to the call to
+`https.createServer`. Note that this object must be JSONifiable, so use strings
+instead of any buffers inside of it.
 
 If you don't use the default websocket update mode, then you'll need to
 manually tell browserify-hmr when it should check for and apply updates. You

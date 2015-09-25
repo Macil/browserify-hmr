@@ -3,6 +3,7 @@
 var _ = require('lodash');
 var express = require('express');
 var http = require('http');
+var https = require('https');
 var socketio = require('socket.io');
 var has = require('./has');
 
@@ -10,13 +11,13 @@ function log() {
   console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
 }
 
-var hostname, port;
+var hostname, port, tlsoptions;
 var io;
 var currentModuleData = {};
 
 var runServer = _.once(function() {
   var app = express();
-  var server = http.Server(app);
+  var server = tlsoptions ? https.Server(tlsoptions, app) : http.Server(app);
   io = socketio(server);
   io.on('connection', function(socket) {
     socket.on('sync', function(syncMsg) {
@@ -58,11 +59,10 @@ function setNewModuleData(newModuleData, removedModules) {
 
 process.on('message', function(msg) {
   if (msg.type === 'config') {
-    // log('received config');
     hostname = msg.hostname;
     port = msg.port;
+    tlsoptions = msg.tlsoptions;
   } else if (msg.type === 'setNewModuleData') {
-    // log('received setNewModuleData');
     process.send({type: 'confirmNewModuleData'});
     setNewModuleData(msg.newModuleData, msg.removedModules);
   } else {
