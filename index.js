@@ -61,7 +61,7 @@ module.exports = function(bundle, opts) {
     updateMode = 'ajax';
   }
   var updateUrl = readOpt(opts, 'url', 'u', null);
-  var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', true));
+  var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', false));
   var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+updateUrl);
   var cert = readOpt(opts, 'tlscert', 'C', null);
   var key = readOpt(opts, 'tlskey', 'K', null);

@@ -77,8 +77,9 @@ for AJAX requests. This only has an effect if the update mode is set to "ajax".
 If true, then a random parameter is appended to the URL on every request. This
 allows the cache to be bypassed when the server does not give a low Expires or
 Cache-Control header value. Note that this prevents E-Tag and Last-Modified
-headers from being used by the client, so disabling this if it's not needed can
-result in a performance improvement. Defaults to true.
+headers from being used by the client, so keeping this disabled if it's not
+needed can be better for performance. You should consider tuning the HTTP
+headers your script is served with before tweaking this. Defaults to false.
 
 `k, key` is the bundle key. If multiple bundles built using Browserify-HMR are
 run within the same javascript environment, then each must have a unique bundle
