@@ -5,7 +5,7 @@ var express = require('express');
 var http = require('http');
 var https = require('https');
 var socketio = require('socket.io');
-var has = require('./has');
+var has = require('./lib/has');
 
 function log() {
   console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));

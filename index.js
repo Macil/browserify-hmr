@@ -11,7 +11,7 @@ var fs = require('fs');
 var _ = require('lodash');
 var RSVP = require('rsvp');
 var readFile = RSVP.denodeify(fs.readFile);
-var has = require('./has');
+var has = require('./lib/has');
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -77,6 +77,7 @@ module.exports = function(bundle, opts) {
     if (!updateUrl) updateUrl = 'http://localhost:3123';
     sioPath = './'+path.relative(basedir, require.resolve('socket.io-client'));
   }
+  var incPath = './'+path.relative(basedir, require.resolve('./inc/index'));
 
   if (!_.includes(validUpdateModes, updateMode)) {
     throw new Error("Invalid mode "+updateMode);
@@ -185,7 +186,7 @@ module.exports = function(bundle, opts) {
         next(null, row);
       }
     }, function(next) {
-      var source = [sioPath].filter(Boolean).concat(originalEntries).map(function(name) {
+      var source = [sioPath, incPath].filter(Boolean).concat(originalEntries).map(function(name) {
         return 'require('+JSON.stringify(name)+');\n';
       }).join('');
 
@@ -325,7 +326,8 @@ module.exports = function(bundle, opts) {
           .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
           .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
           .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
-          .replace('null/*!^^sioPath*/', JSON.stringify(sioPath));
+          .replace('null/*!^^sioPath*/', JSON.stringify(sioPath))
+          .replace('null/*!^^incPath*/', JSON.stringify(incPath));
         self.push(managerRow);
       }).then(done, done);
     }));
