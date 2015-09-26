@@ -2,62 +2,14 @@
 
 var has = require('../lib/has');
 var StrSet = require('../lib/str-set');
-
-function forEach(array, fn) {
-  for (var i=0,len=array.length; i<len; i++) {
-    fn(array[i], i, array);
-  }
-}
-function some(array, fn) {
-  for (var i=0,len=array.length; i<len; i++) {
-    if (fn(array[i], i, array))
-      return true;
-  }
-  return false;
-}
-function map(array, fn) {
-  var output = new Array(array.length);
-  for (var i=0,len=array.length; i<len; i++) {
-    output[i] = fn(array[i], i, array);
-  }
-  return output;
-}
-function filter(array, fn) {
-  var output = [];
-  for (var i=0,len=array.length; i<len; i++) {
-    if (fn(array[i], i, array))
-      output.push(array[i]);
-  }
-  return output;
-}
-function zipObject(array) {
-  var obj = {};
-  forEach(array, function(value) {
-    obj[value[0]] = value[1];
-  });
-  return obj;
-}
-function forOwn(object, fn) {
-  for (var key in object) {
-    if (has(object, key))
-      fn(object[key], key, object);
-  }
-}
-function mapValues(object, fn) {
-  var output = {};
-  for (var key in object) {
-    if (has(object, key)) {
-      output[key] = fn(object[key], key, object);
-    }
-  }
-  return output;
-}
-function assign(dest, source) {
-  forOwn(source, function(value, key) {
-    dest[key] = value;
-  });
-  return dest;
-}
+var forEach = require('lodash/collection/forEach');
+var some = require('lodash/collection/some');
+var map = require('lodash/collection/map');
+var filter = require('lodash/collection/filter');
+var zipObject = require('lodash/array/zipObject');
+var forOwn = require('lodash/object/forOwn');
+var mapValues = require('lodash/object/mapValues');
+var assign = require('lodash/object/assign');
 
 function emitError(err) {
   setTimeout(function() {
