@@ -61,6 +61,8 @@ module.exports = function(bundle, opts) {
     updateMode = 'ajax';
   }
   var updateUrl = readOpt(opts, 'url', 'u', null);
+  var port = readOpt(opts, 'port', 'p', 3123);
+  var hostname = readOpt(opts, 'hostname', 'h', 'localhost');
   var updateCacheBust = boolOpt(readOpt(opts, 'cacheBust', 'b', false));
   var bundleKey = readOpt(opts, 'key', 'k', updateMode+':'+updateUrl);
   var cert = readOpt(opts, 'tlscert', 'C', null);
@@ -73,12 +75,6 @@ module.exports = function(bundle, opts) {
   var sioPath = null;
   if (updateMode === 'websocket') {
     if (!updateUrl) updateUrl = 'http://localhost:3123';
-
-    var m = /:\/\/([^\/:]+)(?::(\d+))?/.exec(updateUrl);
-    if (!m) throw new Error("Failed to parse update url");
-    var hostname = m[1];
-    var port = m[2] ? +m[2] : 80;
-
     sioPath = './'+path.relative(basedir, require.resolve('socket.io-client'));
   }
 

@@ -72,6 +72,13 @@ Browserify bundle is accessible at. In "websocket" mode, this defaults to
 "http://localhost:3123". This is required for the "ajax" mode. This is not
 required for "fs" mode.
 
+`p, port` is a number that sets the port to listen on if "websocket" mode is
+used. If you change this, you'll most likely want to change the `url` setting
+too. Defaults to 3123.
+
+`h, hostname` is the hostname to listen on if "websocket" mode is used. This
+defaults to "localhost".
+
 `b, cacheBust` is a boolean which controls whether cache busting should be used
 for AJAX requests. This only has an effect if the update mode is set to "ajax".
 If true, then a random parameter is appended to the URL on every request. This
