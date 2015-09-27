@@ -5,6 +5,8 @@
   var originalEntries = null/*!^^originalEntries*/;
   var updateUrl = null/*!^^updateUrl*/;
   var updateMode = null/*!^^updateMode*/;
+  var supportModes = null/*!^^supportModes*/;
+  var ignoreUnaccepted = null/*!^^ignoreUnaccepted*/;
   var updateCacheBust = null/*!^^updateCacheBust*/;
   var bundleKey = null/*!^^bundleKey*/;
   var sioPath = null/*!^^sioPath*/;
@@ -27,7 +29,8 @@
   var main = require(incPath);
   var isFirstRun = main(
     moduleDefs, cachedModules, moduleMeta, updateUrl,
-    updateMode, updateCacheBust, bundleKey, sioPath ? require(sioPath) : null,
+    updateMode, supportModes, ignoreUnaccepted, updateCacheBust, bundleKey,
+    sioPath ? require(sioPath) : null,
     typeof __filename !== 'undefined' && __filename,
     typeof __dirname !== 'undefined' && __dirname
   );

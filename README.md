@@ -1,7 +1,7 @@
 # Browserify-HMR
 
 This an implementation of Webpack's [Hot Module Replacement
-API](http://webpack.github.io/docs/hot-module-replacement.html) as a plugin for
+API](https://webpack.github.io/docs/hot-module-replacement.html) as a plugin for
 Browserify. This project seems to work in many cases, but it is still early in
 development and likely has some bugs at the moment. Let me know how it works
 for you!
@@ -20,7 +20,7 @@ Open [http://localhost:8080/](http://localhost:8080/) and try updating
 ## Hot Module Replacement Usage
 
 Hot module replacement works by re-executing updated modules. The [Hot Module
-Replacement API](http://webpack.github.io/docs/hot-module-replacement.html)
+Replacement API](https://webpack.github.io/docs/hot-module-replacement.html)
 must be used to define which modules can accept updates, and what to do when a
 module is going to be updated.
 
@@ -29,6 +29,18 @@ route. Code transforms and libraries like
 [react-transform-hmr](https://github.com/gaearon/react-transform-hmr) and
 [ud](https://github.com/AgentME/ud) can help do common tasks or entirely
 automate making certain types of code be hot replaceable.
+
+In addition to the `module.hot.*` functions from the Webpack Hot Module
+Replacement API, the following is also implemented:
+
+### module.hot.setUpdateMode(mode, options)
+
+This allows the bundle update mode and options to be changed at runtime. `mode`
+should be a string and has the same meaning as `mode` in the Plugin Options
+section. `options` is an optional object which may have the properties `url`,
+`cacheBust`, and `ignoreUnaccepted`, also with the same meanings as the same
+options in the Plugin Options section. The HMR status must be "idle" when this
+is called.
 
 ## Plugin Usage
 
@@ -55,7 +67,7 @@ if more control over the timing of the reloads is desired.
     nano bar.js # edit some more files
     browserify -p [ browserify-hmr -m ajax -u /bundle.js ] index.js -o bundle.js
 
-## Options
+## Plugin Options
 
 Browserify-HMR options can be specified from the command line following the plugin name with braces in long or short form:
 
@@ -74,11 +86,35 @@ browserify().plugin(hmr, {
 ```
 
 `m, mode` is a string which sets the update mode. "websocket" tells
-browserify-hmr to open a connection to a websocket server hosted by the plugin
-to listen for changes. The websocket will be served over HTTP unless any of the
+the bundle to open a connection to a websocket server hosted by the plugin to
+listen for changes. The websocket will be served over HTTP unless any of the
 tlskey, tlscert, or tlsoptions options are passed. "ajax" uses AJAX requests to
 download updates. "fs" uses the filesystem module and is suitable for Node use.
+"none" causes the bundle to not be configured to check for updates.
+`module.hot.setUpdateMode` may be called at runtime to reconfigure the bundle.
 Defaults to "websocket".
+
+`supportModes` is an optional array of strings specifying other update modes
+to build support for into the bundle in addition to the given `mode`. This must
+be used if the bundle is going to change the update mode by using
+`module.hot.setUpdateMode` at runtime to a mode not given in the `mode` option.
+You can pass this option on the command like this:
+
+    watchify -p [ browserify-hmr -m none --supportModes [ ajax websocket ] ] index.js -o bundle.js
+
+`noServe` is a boolean which allows Browserify-HMR's automatic websocket server
+to be disabled. Normally, the Browserify-HMR plugin automatically hosts a
+websocket server if `mode` or `supportModes` contains "websocket". If this is
+set to true, then the plugin will never host its own websocket server. You
+could use this if you're building a bundle in websocket mode with the `url`
+option set to point to a websocket server hosted by another instance of
+Browserify-HMR. Defaults to false.
+
+`ignoreUnaccepted` is a boolean which controls the value of the
+`ignoreUnaccepted` parameter to `module.hot.apply` for the "websocket" mode.
+(When the "websocket" mode is used, Browserify-HMR automatically checks for
+updates and applies them, so the application never gets a chance to call
+`module.hot.apply` itself.) Defaults to true.
 
 `u, url` is a string which sets the update URL that the websocket connection or
 Browserify bundle is accessible at. In "websocket" mode, this defaults to
@@ -112,7 +148,8 @@ and update url, so you generally don't need to worry about this option.
 
 `tlsoptions` is an object of options to pass to the call to
 `https.createServer`. Note that this object must be JSONifiable, so use strings
-instead of any buffers inside of it.
+instead of any buffers inside of it. This option may not be given by the
+command line.
 
 If you don't use the default websocket update mode, then you'll need to
 manually tell browserify-hmr when it should check for and apply updates. You
@@ -153,8 +190,6 @@ if (module.hot) {
 
 ## Planned Work
 
-* Extend the API so the user can control the update mode and parameters at
-  runtime.
 * There are known bugs currently where changes to modules without update
   accepters can cause the updates to bubble up to the entry and cause many
   modules to be reloaded incorrectly.

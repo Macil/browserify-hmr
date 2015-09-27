@@ -31,11 +31,13 @@ var console = global.console ? global.console : {
 
 function main(
   moduleDefs, cachedModules, moduleMeta, updateUrl,
-  updateMode, updateCacheBust, bundleKey, socketio,
+  updateMode, supportModes, ignoreUnaccepted, updateCacheBust, bundleKey,
+  socketio,
   bundle__filename, bundle__dirname
 ) {
   var moduleIndexesToNames = makeModuleIndexesToNames(moduleMeta);
 
+  var socket;
   var name, i, len;
 
   if (!global._hmr[bundleKey].setStatus) {
@@ -374,6 +376,160 @@ function main(
       cb(errCanWait, acceptedUpdates);
     };
 
+    var moduleHotSetUpdateMode = function(mode, options) {
+      options = options || {};
+
+      if (supportModes.indexOf(mode) === -1) {
+        throw new Error("Mode "+mode+" not in supportModes. Please check the Browserify-HMR plugin options.");
+      }
+      if (mode === 'ajax' && !options.url) {
+        throw new Error("url required for ajax update mode");
+      }
+      if (localHmr.status !== 'idle') {
+        throw new Error("module.hot.setUpdateMode can only be called while status is idle");
+      }
+
+      localHmr.newLoad = null;
+      localHmr.updateMode = updateMode = mode;
+      localHmr.updateUrl = updateUrl = options.url;
+      updateCacheBust = options.cacheBust;
+      ignoreUnaccepted = has(options, 'ignoreUnaccepted') ? options.ignoreUnaccepted : true;
+
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+      if (mode === 'websocket') {
+        socket = setupSocket();
+      }
+    };
+
+    var setupSocket = function() {
+      var url = updateUrl || 'http://localhost:3123';
+      var socket = socketio(url, {'force new connection': true});
+      console.log('[HMR] Attempting websocket connection to', url);
+
+      var isAcceptingMessages = false;
+      socket.on('connect', function() {
+        isAcceptingMessages = false;
+        var syncMsg = mapValues(runtimeModuleInfo, function(value, name) {
+          return {
+            hash: value.hash
+          };
+        });
+        socket.emit('sync', syncMsg);
+      });
+      var isUpdating = false;
+      var queuedUpdateMessages = [];
+      socket.on('sync confirm', function() {
+        console.log('[HMR] Websocket connection successful.');
+        isAcceptingMessages = true;
+        queuedUpdateMessages = [];
+      });
+      socket.on('disconnect', function() {
+        console.log('[HMR] Websocket connection lost.');
+      });
+      var acceptNewModules = function(msg) {
+        // Make sure we don't accept new modules before we've synced ourselves.
+        if (!isAcceptingMessages) return;
+        if (isUpdating) {
+          queuedUpdateMessages.push(msg);
+          return;
+        }
+        // Take the message and create a localHmr.newLoad value as if the
+        // bundle had been re-executed, then call moduleHotApply.
+        isUpdating = true;
+
+        // random id so we can make the normally unnamed args have random names
+        var rid = String(Math.random()).replace(/[^0-9]/g, '');
+
+        var newModuleDefs = localHmr.newLoad ? localHmr.newLoad.moduleDefs : assign({}, moduleDefs);
+        var newModuleMeta = localHmr.newLoad ?
+          localHmr.newLoad.moduleMeta : mapValues(runtimeModuleInfo, function(value, key) {
+            return {
+              index: value.index,
+              hash: value.hash,
+              parents: value.parents.toArray()
+            };
+          });
+        forOwn(msg.newModuleData, function(value, key) {
+          newModuleMeta[key] = {
+            index: value.index,
+            hash: value.hash,
+            parents: value.parents
+          };
+        });
+        forEach(msg.removedModules, function(removedName) {
+          delete newModuleDefs[runtimeModuleInfo[removedName].index];
+          delete newModuleMeta[removedName];
+        });
+        var newModuleIndexesToNames = makeModuleIndexesToNames(newModuleMeta);
+        forOwn(msg.newModuleData, function(value, key) {
+          // this part needs to run after newModuleMeta and
+          // newModuleIndexesToNames are populated.
+          var newModuleFunction = (function() {
+            var fn;
+            //jshint evil:true
+            if (bundle__filename || bundle__dirname) {
+              fn = new Function('require', 'module', 'exports', '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, '__filename', '__dirname', value.source);
+              return function(require, module, exports, _u1, _u2, _u3, _u4) {
+                global._hmr[bundleKey].initModule(key, module);
+                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4, bundle__filename, bundle__dirname);
+              };
+            } else {
+              fn = new Function('require', 'module', 'exports',  '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, value.source);
+              return function(require, module, exports, _u1, _u2, _u3, _u4) {
+                global._hmr[bundleKey].initModule(key, module);
+                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4);
+              };
+            }
+          })();
+
+          newModuleDefs[newModuleMeta[key].index] = [
+            // module function
+            newModuleFunction,
+            // module deps
+            mapValues(value.deps, function(depIndex, depRef) {
+              var depName = newModuleIndexesToNames[depIndex];
+              if (has(newModuleMeta, depName)) {
+                return newModuleMeta[depName].index;
+              } else {
+                return depName;
+              }
+            })
+          ];
+        });
+        localHmr.newLoad = {
+          moduleDefs: newModuleDefs,
+          moduleMeta: newModuleMeta,
+          moduleIndexesToNames: newModuleIndexesToNames
+        };
+        localHmr.setStatus('ready');
+        var outdatedModules = getOutdatedModules();
+        moduleHotApply({ignoreUnaccepted: ignoreUnaccepted}, function(err, updatedNames) {
+          if (err) {
+            console.error('[HMR] Error applying update', err);
+          }
+          if (updatedNames) {
+            console.log('[HMR] Updated modules', updatedNames);
+            if (outdatedModules.length !== updatedNames.length) {
+              var notUpdatedNames = filter(outdatedModules, function(name) {
+                return updatedNames.indexOf(name) === -1;
+              });
+              console.log('[HMR] Some modules were not updated', notUpdatedNames);
+            }
+          }
+          isUpdating = false;
+          var queuedMsg;
+          while ((queuedMsg = queuedUpdateMessages.shift())) {
+            acceptNewModules(queuedMsg);
+          }
+        });
+      };
+      socket.on('new modules', acceptNewModules);
+      return socket;
+    };
+
     var localHmr = {
       updateUrl: updateUrl,
       updateMode: updateMode,
@@ -478,132 +634,15 @@ function main(
             if (ix !== -1) {
               localHmr.statusHandlers.splice(ix, 1);
             }
-          }
+          },
+          setUpdateMode: moduleHotSetUpdateMode
         };
       }
     };
     global._hmr[bundleKey] = localHmr;
 
     if (updateMode === 'websocket') {
-      var socket = socketio(updateUrl);
-      var isAcceptingMessages = false;
-      socket.on('connect', function() {
-        isAcceptingMessages = false;
-        var syncMsg = mapValues(runtimeModuleInfo, function(value, name) {
-          return {
-            hash: value.hash
-          };
-        });
-        socket.emit('sync', syncMsg);
-      });
-      var isUpdating = false;
-      var queuedUpdateMessages = [];
-      socket.on('sync confirm', function() {
-        console.log('[HMR] Websocket connection successful.');
-        isAcceptingMessages = true;
-        queuedUpdateMessages = [];
-      });
-      socket.on('disconnect', function() {
-        console.log('[HMR] Websocket connection lost.');
-      });
-      var acceptNewModules = function(msg) {
-        // Make sure we don't accept new modules before we've synced ourselves.
-        if (!isAcceptingMessages) return;
-        if (isUpdating) {
-          queuedUpdateMessages.push(msg);
-          return;
-        }
-        // Take the message and create a localHmr.newLoad value as if the
-        // bundle had been re-executed, then call moduleHotApply.
-        isUpdating = true;
-
-        // random id so we can make the normally unnamed args have random names
-        var rid = String(Math.random()).replace(/[^0-9]/g, '');
-
-        var newModuleDefs = localHmr.newLoad ? localHmr.newLoad.moduleDefs : assign({}, moduleDefs);
-        var newModuleMeta = localHmr.newLoad ?
-          localHmr.newLoad.moduleMeta : mapValues(runtimeModuleInfo, function(value, key) {
-            return {
-              index: value.index,
-              hash: value.hash,
-              parents: value.parents.toArray()
-            };
-          });
-        forOwn(msg.newModuleData, function(value, key) {
-          newModuleMeta[key] = {
-            index: value.index,
-            hash: value.hash,
-            parents: value.parents
-          };
-        });
-        forEach(msg.removedModules, function(removedName) {
-          delete newModuleDefs[runtimeModuleInfo[removedName].index];
-          delete newModuleMeta[removedName];
-        });
-        var newModuleIndexesToNames = makeModuleIndexesToNames(newModuleMeta);
-        forOwn(msg.newModuleData, function(value, key) {
-          // this part needs to run after newModuleMeta and
-          // newModuleIndexesToNames are populated.
-          var newModuleFunction = (function() {
-            var fn;
-            //jshint evil:true
-            if (bundle__filename || bundle__dirname) {
-              fn = new Function('require', 'module', 'exports', '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, '__filename', '__dirname', value.source);
-              return function(require, module, exports, _u1, _u2, _u3, _u4) {
-                global._hmr[bundleKey].initModule(key, module);
-                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4, bundle__filename, bundle__dirname);
-              };
-            } else {
-              fn = new Function('require', 'module', 'exports',  '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, value.source);
-              return function(require, module, exports, _u1, _u2, _u3, _u4) {
-                global._hmr[bundleKey].initModule(key, module);
-                fn.call(this, require, module, exports, _u1, _u2, _u3, _u4);
-              };
-            }
-          })();
-
-          newModuleDefs[newModuleMeta[key].index] = [
-            // module function
-            newModuleFunction,
-            // module deps
-            mapValues(value.deps, function(depIndex, depRef) {
-              var depName = newModuleIndexesToNames[depIndex];
-              if (has(newModuleMeta, depName)) {
-                return newModuleMeta[depName].index;
-              } else {
-                return depName;
-              }
-            })
-          ];
-        });
-        localHmr.newLoad = {
-          moduleDefs: newModuleDefs,
-          moduleMeta: newModuleMeta,
-          moduleIndexesToNames: newModuleIndexesToNames
-        };
-        localHmr.setStatus('ready');
-        var outdatedModules = getOutdatedModules();
-        moduleHotApply({ignoreUnaccepted: true}, function(err, updatedNames) {
-          if (err) {
-            console.error('[HMR] Error applying update', err);
-          }
-          if (updatedNames) {
-            console.log('[HMR] Updated modules', updatedNames);
-            if (outdatedModules.length !== updatedNames.length) {
-              var notUpdatedNames = filter(outdatedModules, function(name) {
-                return updatedNames.indexOf(name) === -1;
-              });
-              console.log('[HMR] Some modules were not updated', notUpdatedNames);
-            }
-          }
-          isUpdating = false;
-          var queuedMsg;
-          while ((queuedMsg = queuedUpdateMessages.shift())) {
-            acceptNewModules(queuedMsg);
-          }
-        });
-      };
-      socket.on('new modules', acceptNewModules);
+      socket = setupSocket();
     }
     return true;
   } else { // We're in a reload!

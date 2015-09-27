@@ -6,7 +6,7 @@ import tmpDir from './lib/tmp-dir';
 import rmrf from './lib/rmrf';
 import copy from './lib/copy';
 
-describe('browserify-hmr', function() {
+describe('plugin (integration)', function() {
   let dir = null;
 
   beforeEach(co.wrap(function*() {
@@ -187,4 +187,26 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
+  it('setUpdateMode works', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    const index = path.join(dir, 'setUpdateMode-index.js');
+    const dep = path.join(dir, 'basic-dep.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/setUpdateMode-index.js', index);
+    yield copy('./test/data/basic-dep1.js', dep);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/basic-dep2.js', dep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
 });

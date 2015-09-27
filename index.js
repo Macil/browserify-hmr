@@ -23,7 +23,7 @@ var readManagerTemplate = _.once(function() {
   return readFile(path.join(__dirname, 'hmr-manager-template.js'), 'utf8');
 });
 
-var validUpdateModes = ['websocket', 'ajax', 'fs'];
+var validUpdateModes = ['websocket', 'ajax', 'fs', 'none'];
 var updateModesNeedingUrl = ['ajax'];
 
 function makeIdentitySourceMap(content, resourcePath) {
@@ -46,7 +46,7 @@ function makeIdentitySourceMap(content, resourcePath) {
 }
 
 function readOpt(opts, long, short, defval) {
-  return has(opts, long) ? opts[long] : has(opts, short) ? opts[short] : defval;
+  return has(opts, long) ? opts[long] : (short && has(opts, short)) ? opts[short] : defval;
 }
 
 function boolOpt(value) {
@@ -68,23 +68,32 @@ module.exports = function(bundle, opts) {
   var cert = readOpt(opts, 'tlscert', 'C', null);
   var key = readOpt(opts, 'tlskey', 'K', null);
   var tlsoptions = opts.tlsoptions;
+  var supportModes = (opts.supportModes && opts.supportModes._) || opts.supportModes || [];
+  var noServe = boolOpt(readOpt(opts, 'noServe', null, false));
+  var ignoreUnaccepted = boolOpt(readOpt(opts, 'ignoreUnaccepted', null, true));
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
   var em = new EventEmitter();
 
-  var sioPath = null;
-  if (updateMode === 'websocket') {
-    if (!updateUrl) updateUrl = 'http://localhost:3123';
-    sioPath = './'+path.relative(basedir, require.resolve('socket.io-client'));
-  }
-  var incPath = './'+path.relative(basedir, require.resolve('./inc/index'));
+  supportModes = _.uniq(['none', updateMode].concat(supportModes));
 
-  if (!_.includes(validUpdateModes, updateMode)) {
-    throw new Error("Invalid mode "+updateMode);
-  }
+  supportModes.forEach(function(updateMode) {
+    if (!_.includes(validUpdateModes, updateMode)) {
+      throw new Error("Invalid mode "+updateMode);
+    }
+  });
   if (!updateUrl && _.includes(updateModesNeedingUrl, updateMode)) {
     throw new Error("url option must be specified for "+updateMode+" mode");
   }
+
+  var incPath = './'+path.relative(basedir, require.resolve('./inc/index'));
+
+  var sioPath = null;
+  if (_.includes(supportModes, 'websocket')) {
+    sioPath = './'+path.relative(basedir, require.resolve('socket.io-client'));
+  }
+
+  var useLocalSocketServer = !noServe && _.includes(supportModes, 'websocket');
 
   var server;
   var nextServerConfirm = RSVP.defer();
@@ -133,7 +142,9 @@ module.exports = function(bundle, opts) {
   var currentModuleData = {};
 
   function setNewModuleData(moduleData) {
-    if (updateMode !== 'websocket') return RSVP.Promise.resolve();
+    if (!useLocalSocketServer) {
+      return RSVP.Promise.resolve();
+    }
     return runServer().then(function() {
       var newModuleData = _.chain(moduleData)
         .pairs()
@@ -290,7 +301,7 @@ module.exports = function(bundle, opts) {
             return row;
           };
         }
-        if (updateMode === 'websocket') {
+        if (useLocalSocketServer) {
           moduleData[fileKey(row.file)] = {
             isNew: isNew,
             index: moduleMeta[fileKey(row.file)].index,
@@ -324,6 +335,8 @@ module.exports = function(bundle, opts) {
           .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
           .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
           .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
+          .replace('null/*!^^supportModes*/', JSON.stringify(supportModes))
+          .replace('null/*!^^ignoreUnaccepted*/', JSON.stringify(ignoreUnaccepted))
           .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
           .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
           .replace('null/*!^^sioPath*/', JSON.stringify(sioPath))
