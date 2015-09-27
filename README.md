@@ -17,7 +17,20 @@ npm i && npm start
 Open [http://localhost:8080/](http://localhost:8080/) and try updating
 `label.jsx` and `interval.js`.
 
-## Usage
+## Hot Module Replacement Usage
+
+Hot module replacement works by re-executing updated modules. The [Hot Module
+Replacement API](http://webpack.github.io/docs/hot-module-replacement.html)
+must be used to define which modules can accept updates, and what to do when a
+module is going to be updated.
+
+However, using the HMR API directly in application code is not always the best
+route. Code transforms and libraries like
+[react-transform-hmr](https://github.com/gaearon/react-transform-hmr) and
+[ud](https://github.com/AgentME/ud) can help do common tasks or entirely
+automate making certain types of code be hot replaceable.
+
+## Plugin Usage
 
 Add the browserify-hmr plugin to your watchify call:
 
