@@ -285,9 +285,18 @@ module.exports = function(bundle, opts) {
               inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
             }
 
+            var str;
+            try {
+              str = sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap));
+            }
+            catch(ex) {
+              inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
+              str = sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap));
+            }
+
             var node = new sm.SourceNode(null, null, null, [
               new sm.SourceNode(null, null, null, header),
-              sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
+              str,
               new sm.SourceNode(null, null, null, footer)
             ]);
 
