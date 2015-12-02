@@ -1,5 +1,8 @@
 module.hot.dispose(function(data) {
-  data.foo = 'bar';
+  data.bar = 'bar';
+});
+module.hot.dispose(function(data) {
+  data.foo = 'foo';
 });
 
 module.exports = 1;

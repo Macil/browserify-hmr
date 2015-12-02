@@ -6,7 +6,7 @@ import tmpDir from './lib/tmp-dir';
 import rmrf from './lib/rmrf';
 import copy from './lib/copy';
 
-describe('browserify-hmr', function() {
+describe('plugin (integration)', function() {
   let dir = null;
 
   beforeEach(co.wrap(function*() {
@@ -20,7 +20,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('basic case works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'basic-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -36,14 +36,15 @@ describe('browserify-hmr', function() {
         yield delay(200);
         yield copy('./test/data/basic-dep2.js', dep);
         yield run('./node_modules/.bin/browserify', [
-          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+          // test --full-paths too
+          '--node','--full-paths','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
       })
     ]);
   }));
 
   it('self accepting works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'self-index.js');
     const dep = path.join(dir, 'self-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -65,8 +66,54 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
+  it('multiple bundles work', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    // run the self-accepter initial bundle, then the basic case initial
+    // bundle, then update the basic case bundle and make sure that works.
+
+    const selfIndex = path.join(dir, 'self-index.js');
+    const selfDep = path.join(dir, 'self-dep.js');
+    const selfBundle = path.join(dir, 'bundle.js');
+
+    const basicIndex = path.join(dir, 'basic-index.js');
+    const basicDep = path.join(dir, 'basic-dep.js');
+    const basicBundle = path.join(dir, 'basic-bundle.js');
+
+    yield Promise.all([
+      co(function*() {
+        yield copy('./test/data/self-index.js', selfIndex);
+        yield copy('./test/data/self-dep1.js', selfDep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs','-k','self',']',selfIndex,'-o',selfBundle
+        ]);
+      }),
+      co(function*() {
+        yield copy('./test/data/basic-index.js', basicIndex);
+        yield copy('./test/data/basic-dep1.js', basicDep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
+        ]);
+      })
+    ]);
+
+    yield Promise.all([
+      run('node', [
+        '-e',
+        `require(${JSON.stringify(selfBundle)}); require(${JSON.stringify(basicBundle)});`
+      ]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/basic-dep2.js', basicDep);
+        yield run('./node_modules/.bin/browserify', [
+          // test --full-paths too
+          '--node','--full-paths','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
+        ]);
+      })
+    ]);
+  }));
+
   it('deep accepting works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'deep-index.js');
     const depA = path.join(dir, 'deep-dep-a.js');
     const depB = path.join(dir, 'deep-dep-b.js');
@@ -91,7 +138,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('new dependency works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'new-index.js');
     const depA = path.join(dir, 'new-dep-a.js');
     const depB = path.join(dir, 'new-dep-b.js');
@@ -116,7 +163,7 @@ describe('browserify-hmr', function() {
   }));
 
   it('remove dependency works', co.wrap(function*() {
-    this.slow();
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'remove-index.js');
     const depA = path.join(dir, 'remove-dep-a.js');
     const depB = path.join(dir, 'remove-dep-b.js');
@@ -140,8 +187,31 @@ describe('browserify-hmr', function() {
     ]);
   }));
 
-  it.only('lone entry without accepts should not update', co.wrap(function*() {
-    this.slow();
+  it('setUpdateMode works', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    const index = path.join(dir, 'setUpdateMode-index.js');
+    const dep = path.join(dir, 'basic-dep.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/setUpdateMode-index.js', index);
+    yield copy('./test/data/basic-dep1.js', dep);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/basic-dep2.js', dep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
+  it('lone entry without accepts should not update', co.wrap(function*() {
+    this.slow();this.timeout(5000);
     const index = path.join(dir, 'lone-index.js');
     const bundle = path.join(dir, 'bundle.js');
 
@@ -160,5 +230,4 @@ describe('browserify-hmr', function() {
       })
     ]);
   }));
-
 });

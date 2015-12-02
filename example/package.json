@@ -8,13 +8,28 @@
     "start": "./scripts/run",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "browserify": {
+    "transform": [
+      "babelify",
+      "envify"
+    ]
+  },
   "devDependencies": {
-    "browserify": "^11.0.1",
-    "browserify-hmr": "^0.1.0",
+    "babel-plugin-react-transform": "^1.1.1",
+    "browserify": "^11.1.0",
+    "browserify-hmr": "^0.3.0",
     "http-server": "^0.8.0",
-    "watchify": "^3.3.1"
+    "react-transform-catch-errors": "^1.0.0",
+    "react-transform-hmr": "^1.0.0",
+    "redbox-react": "^1.1.1",
+    "watchify": "^3.4.0"
   },
   "dependencies": {
-    "jquery": "^2.1.4"
+    "babel-runtime": "^5.8.24",
+    "babelify": "^6.3.0",
+    "envify": "^3.4.0",
+    "jquery": "^2.1.4",
+    "react": "^0.13.3",
+    "ud": "^2.0.1"
   }
 }

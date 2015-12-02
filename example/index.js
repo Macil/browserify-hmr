@@ -1,24 +1,11 @@
-require('./label');
+var $ = require('jquery');
+var React = require('react');
+import Label from './label.jsx';
+require('./interval')();
 
-if (module.hot) {
-  var doCheck = function() {
-    module.hot.check(function(err, outdated) {
-      if (err) {
-        console.error('Check error', err);
-      }
-      if (outdated) {
-        module.hot.apply(function(err, updated) {
-          if (err) {
-            console.error('Update error', err);
-          } else {
-            console.log('Replaced modules', updated);
-          }
-          setTimeout(doCheck, 2000);
-        });
-      } else {
-        setTimeout(doCheck, 2000);
-      }
-    });
-  };
-  doCheck();
-}
+$(document).ready(() => {
+  React.render(
+    React.createElement(Label, null),
+    document.getElementById('main')
+  );
+});
