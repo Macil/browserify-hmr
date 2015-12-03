@@ -223,7 +223,55 @@ describe('plugin (integration)', function() {
       run('node', [bundle]),
       co(function*() {
         yield delay(200);
-        yield copy('./test/data/lone-index2.js', index);
+        yield copy('./test/data/fail.js', index);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
+  it('entry with deps without accepts should not update', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    const index = path.join(dir, 'no-update-index.js');
+    const dep = path.join(dir, 'no-update-dep.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/no-update-index.js', index);
+    yield copy('./test/data/no-update-dep.js', dep);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/fail.js', dep);
+        yield run('./node_modules/.bin/browserify', [
+          '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+        ]);
+      })
+    ]);
+  }));
+
+  it.only('self declining works', co.wrap(function*() {
+    this.slow();this.timeout(5000);
+    const index = path.join(dir, 'self-decline-index.js');
+    const depA = path.join(dir, 'self-decline-dep-a.js');
+    const depB = path.join(dir, 'self-decline-dep-b.js');
+    const bundle = path.join(dir, 'bundle.js');
+
+    yield copy('./test/data/self-decline-index.js', index);
+    yield copy('./test/data/self-decline-dep-a.js', depA);
+    yield copy('./test/data/self-decline-dep-b.js', depB);
+    yield run('./node_modules/.bin/browserify', [
+      '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
+    ]);
+    yield Promise.all([
+      run('node', [bundle]),
+      co(function*() {
+        yield delay(200);
+        yield copy('./test/data/fail.js', depB);
         yield run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
