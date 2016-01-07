@@ -11,6 +11,7 @@
   var bundleKey = null/*!^^bundleKey*/;
   var sioPath = null/*!^^sioPath*/;
   var incPath = null/*!^^incPath*/;
+  var id = null/*!^^id*/;
 
   if (!global._hmr) {
     try {
@@ -28,6 +29,7 @@
 
   var main = require(incPath);
   var isFirstRun = main(
+    id,
     moduleDefs, cachedModules, moduleMeta, updateUrl,
     updateMode, supportModes, ignoreUnaccepted, updateCacheBust, bundleKey,
     sioPath ? require(sioPath) : null,

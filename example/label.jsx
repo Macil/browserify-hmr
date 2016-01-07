@@ -3,6 +3,7 @@
 var React = require('react');
 
 var Label = React.createClass({
+  displayName: 'Label',
   render() {
     return (
       <div className="commentBox">

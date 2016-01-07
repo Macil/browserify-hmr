@@ -30,6 +30,7 @@ var console = global.console ? global.console : {
 };
 
 function main(
+  id,
   moduleDefs, cachedModules, moduleMeta, updateUrl,
   updateMode, supportModes, ignoreUnaccepted, updateCacheBust, bundleKey,
   socketio,
@@ -417,6 +418,7 @@ function main(
             hash: value.hash
           };
         });
+        syncMsg.id = id
         socket.emit('sync', syncMsg);
       });
       var isUpdating = false;
@@ -432,6 +434,12 @@ function main(
       var acceptNewModules = function(msg) {
         // Make sure we don't accept new modules before we've synced ourselves.
         if (!isAcceptingMessages) return;
+
+        if (msg.id != id) {
+          return;
+        }
+        delete msg.id
+
         if (isUpdating) {
           queuedUpdateMessages.push(msg);
           return;
@@ -526,6 +534,7 @@ function main(
           }
         });
       };
+
       socket.on('new modules', acceptNewModules);
       return socket;
     };

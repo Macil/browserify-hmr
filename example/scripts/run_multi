@@ -1,0 +1,4 @@
+#!/bin/bash
+NODE_ENV=development node ./scripts/multi.js &
+./node_modules/.bin/http-server -c 1 -a localhost &
+wait
