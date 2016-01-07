@@ -22,7 +22,10 @@ var runServer = _.once(function() {
   io.on('connection', function(socket) {
     socket.on('sync', function(syncMsg) {
       log('User connected, syncing');
-      var newModuleData = _.chain(currentModuleData)
+      var id = syncMsg.id
+      delete syncMsg.id
+      currentModuleData[id] = currentModuleData[id] || {}
+      var newModuleData = _.chain(currentModuleData[id])
         .pairs()
         .filter(function(pair) {
           return !has(syncMsg, pair[0]) || syncMsg[pair[0]].hash !== pair[1].hash;
@@ -32,12 +35,13 @@ var runServer = _.once(function() {
       var removedModules = _.chain(syncMsg)
         .keys()
         .filter(function(name) {
-          return !has(currentModuleData, name);
+          return !has(currentModuleData[id], name);
         })
         .value();
       socket.emit('sync confirm', null);
       if (Object.keys(newModuleData).length || removedModules.length)
-        socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
+        log('Init updates: new ' + Object.keys(newModuleData).length + ', removed ' + removedModules.length);
+        socket.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules, id: id});
     });
   });
   server.listen(port, hostname, function() {
@@ -45,15 +49,16 @@ var runServer = _.once(function() {
   });
 });
 
-function setNewModuleData(newModuleData, removedModules) {
+function setNewModuleData(newModuleData, removedModules, id) {
   runServer();
-  _.assign(currentModuleData, newModuleData);
+  currentModuleData[id] = currentModuleData[id] || {}
+  _.assign(currentModuleData[id], newModuleData);
   removedModules.forEach(function(name) {
-    delete currentModuleData[name];
+    delete currentModuleData[id][name];
   });
   if (Object.keys(newModuleData).length || removedModules.length) {
-    log('Emitting updates');
-    io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
+    log('Emitting updates: new ' + Object.keys(newModuleData).length + ', removed ' + removedModules.length);
+    io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules, id: id});
   }
 }
 
@@ -64,11 +69,12 @@ process.on('message', function(msg) {
     tlsoptions = msg.tlsoptions;
   } else if (msg.type === 'setNewModuleData') {
     process.send({type: 'confirmNewModuleData'});
-    setNewModuleData(msg.newModuleData, msg.removedModules);
+    setNewModuleData(msg.newModuleData, msg.removedModules, msg.id);
   } else {
     log('Unknow message type', msg.type);
   }
 });
+
 process.on('disconnect', function() {
   process.exit(0);
 });

@@ -71,6 +71,7 @@ module.exports = function(bundle, opts) {
   var supportModes = (opts.supportModes && opts.supportModes._) || opts.supportModes || [];
   var noServe = boolOpt(readOpt(opts, 'noServe', null, false));
   var ignoreUnaccepted = boolOpt(readOpt(opts, 'ignoreUnaccepted', null, true));
+  var multiBundle = boolOpt(readOpt(opts, 'multiBundle', null, false));
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
   var em = new EventEmitter();
@@ -141,36 +142,30 @@ module.exports = function(bundle, opts) {
 
   var currentModuleData = {};
 
-  function setNewModuleData(moduleData) {
+  function setNewModuleData(moduleData, id) {
     if (!useLocalSocketServer) {
       return RSVP.Promise.resolve();
     }
     return runServer().then(function() {
-      var newModuleData = _.chain(moduleData)
+     currentModuleData[id] = currentModuleData[id] || {}
+     var newModuleData = _.chain(moduleData)
         .pairs()
         .filter(function(pair) {
-          return pair[1].isNew;
-        })
-        .map(function(pair) {
-          return [pair[0], {
-            index: pair[1].index,
-            hash: pair[1].hash,
-            source: pair[1].source,
-            parents: pair[1].parents,
-            deps: pair[1].deps
-          }];
+          return !has(currentModuleData[id], pair[0]) || currentModuleData[id][pair[0]].hash !== pair[1].hash;
         })
         .zipObject()
         .value();
-      var removedModules = _.chain(currentModuleData)
+
+      var removedModules = _.chain(currentModuleData[id])
         .keys()
         .filter(function(name) {
           return !has(moduleData, name);
         })
         .value();
-      currentModuleData = moduleData;
+      currentModuleData[id] = moduleData;
       server.send({
         type: 'setNewModuleData',
+        id: id,
         newModuleData: newModuleData,
         removedModules: removedModules
       });
@@ -181,8 +176,6 @@ module.exports = function(bundle, opts) {
   function fileKey(filename) {
     return path.relative(basedir, filename);
   }
-
-  var hmrManagerFilename;
 
   // keys are filenames, values are {hash, transformedSource}
   var transformCache = {};
@@ -197,22 +190,38 @@ module.exports = function(bundle, opts) {
         next(null, row);
       }
     }, function(next) {
-      var source = [sioPath, incPath].filter(Boolean).concat(originalEntries).map(function(name) {
-        return 'require('+JSON.stringify(name)+');\n';
-      }).join('');
+      var self = this;
+      var hmrManagerFilename;
+      function pushHmrManagerFile(entry) {
+        var source = [sioPath, incPath].filter(Boolean).concat(entry).map(function(name) {
+          return 'require('+JSON.stringify(name)+');\n';
+        }).join('');
 
-      // Put the hmr file name in basedir to prevent this:
-      // https://github.com/babel/babelify/issues/85
-      hmrManagerFilename = path.join(basedir, '__hmr_manager.js');
-      this.push({
-        entry: true,
-        expose: false,
-        basedir: undefined,
-        file: hmrManagerFilename,
-        id: hmrManagerFilename,
-        source: source,
-        order: 0
-      });
+        if (multiBundle) {
+          hmrManagerFilename = entry + '__hmr_manager.js';
+        } else {
+          // Put the hmr file name in basedir to prevent this:
+          // https://github.com/babel/babelify/issues/85
+          hmrManagerFilename = path.join(basedir, '__hmr_manager.js');
+        }
+        self.push({
+          entry: true,
+          expose: false,
+          basedir: undefined,
+          file: hmrManagerFilename,
+          id: hmrManagerFilename,
+          source: source,
+          order: 0,
+          hmrManager: true,
+          originalEntries: [].concat(entry),
+        });
+      }
+      if (multiBundle) {
+        originalEntries.map(pushHmrManagerFile)
+      } else {
+        pushHmrManagerFile(originalEntries)
+      }
+
       next();
     }));
 
@@ -229,7 +238,7 @@ module.exports = function(bundle, opts) {
     }
 
     bundle.pipeline.get('deps').push(through.obj(function(row, enc, next) {
-      if (row.file !== hmrManagerFilename) {
+      if (!row.hmrManager) {
         makeModuleMetaEntry(fileKey(row.file));
         _.forOwn(row.deps, function(name, ref) {
           // dependencies that aren't included in the bundle have the name false
@@ -242,10 +251,6 @@ module.exports = function(bundle, opts) {
       next(null, row);
     }));
 
-    var moduleData = {};
-    var newTransformCache = {};
-    var managerRow = null;
-    var rowBuffer = [];
 
     if (bundle.pipeline.get('dedupe').length > 1) {
       console.warn("[HMR] Warning: other plugins have added dedupe transforms. This may interfere.");
@@ -253,97 +258,114 @@ module.exports = function(bundle, opts) {
     // Disable dedupe transforms because it screws with our change tracking.
     bundle.pipeline.splice('dedupe', 1, through.obj());
 
-    bundle.pipeline.get('label').push(through.obj(function(row, enc, next) {
-      if (row.file === hmrManagerFilename) {
-        managerRow = row;
-        next(null);
-      } else {
-        // row.id used when fullPaths flag is used
-        moduleMeta[fileKey(row.file)].index = has(row, 'index') ? row.index : row.id;
+    if (multiBundle) {
+        bundle.removeAllListeners('factor.pipeline');
+        bundle.on('factor.pipeline', sourceTransformHook)
+    } else {
+        sourceTransformHook('bundle', bundle.pipeline)
+    }
 
-        var hash = moduleMeta[fileKey(row.file)].hash = hashStr(row.source);
-        var originalSource = row.source;
-        var isNew, thunk;
-        if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
-          isNew = false;
-          row.source = transformCache[row.file].transformedSource;
-          newTransformCache[row.file] = transformCache[row.file];
-          thunk = _.constant(row);
-        } else {
-          isNew = true;
-          thunk = function() {
-            var header = '_hmr['+JSON.stringify(bundleKey)+
-              '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
-            var footer = '\n}).apply(this, arguments);\n';
+    function sourceTransformHook(id, pipeline) {
+      var moduleData = {};
+      var managerRow = null;
+      var rowBuffer = [];
+      var meta = {};
 
-            var inputMapCV = convert.fromSource(row.source);
-            var inputMap;
-            if (inputMapCV) {
-              inputMap = inputMapCV.toObject();
-              row.source = convert.removeComments(row.source);
-            } else {
-              inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
-            }
-
-            var node = new sm.SourceNode(null, null, null, [
-              new sm.SourceNode(null, null, null, header),
-              sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
-              new sm.SourceNode(null, null, null, footer)
-            ]);
-
-            var result = node.toStringWithSourceMap();
-            row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
-
-            newTransformCache[row.file] = {
-              hash: hash,
-              transformedSource: row.source
-            };
-            return row;
-          };
-        }
-        if (useLocalSocketServer) {
-          moduleData[fileKey(row.file)] = {
-            isNew: isNew,
-            index: moduleMeta[fileKey(row.file)].index,
-            hash: hash,
-            source: originalSource,
-            parents: moduleMeta[fileKey(row.file)].parents,
-            deps: row.indexDeps || row.deps
-          };
-
-          // Buffer everything so we can get the websocket stuff done sooner
-          // without being slowed down by the final bundling.
-          rowBuffer.push(thunk);
+      pipeline.get('pack').unshift(through.obj(function(row, enc, next) {
+        if (row.hmrManager) {
+          managerRow = row;
           next(null);
         } else {
-          next(null, thunk());
+          // row.id used when fullPaths flag is used
+          moduleMeta[fileKey(row.file)].index = has(row, 'index') ? row.index : row.id;
+
+          var hash = hashStr(row.source);
+          meta[fileKey(row.file)] = moduleMeta[fileKey(row.file)];
+          var originalSource = row.source;
+          var isNew, thunk;
+          if (row.transformed) {
+            thunk = _.constant(row);
+          } else if (has(transformCache, row.file) && transformCache[row.file].hash === hash) {
+            row.transformed = true;
+            row.source = transformCache[row.file].transformedSource;
+            moduleMeta[fileKey(row.file)].hash = hash;
+            thunk = _.constant(row);
+          } else {
+            row.transformed = true;
+            moduleMeta[fileKey(row.file)].hash = hash;
+            thunk = function() {
+              var header = '_hmr['+JSON.stringify(bundleKey)+
+                '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
+              var footer = '\n}).apply(this, arguments);\n';
+
+              var inputMapCV = convert.fromSource(row.source);
+              var inputMap;
+              if (inputMapCV) {
+                inputMap = inputMapCV.toObject();
+                row.source = convert.removeComments(row.source);
+              } else {
+                inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
+              }
+
+              var node = new sm.SourceNode(null, null, null, [
+                new sm.SourceNode(null, null, null, header),
+                sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
+                new sm.SourceNode(null, null, null, footer)
+              ]);
+
+              var result = node.toStringWithSourceMap();
+              row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
+
+              transformCache[row.file] = {
+                hash: hash,
+                transformedSource: row.source
+              };
+              return row;
+            };
+          }
+          if (useLocalSocketServer) {
+            moduleData[fileKey(row.file)] = {
+              index: moduleMeta[fileKey(row.file)].index,
+              hash: moduleMeta[fileKey(row.file)].hash,
+              source: originalSource,
+              parents: moduleMeta[fileKey(row.file)].parents,
+              deps: row.indexDeps || row.deps
+            };
+
+            // Buffer everything so we can get the websocket stuff done sooner
+            // without being slowed down by the final bundling.
+            rowBuffer.push(thunk);
+            next(null);
+          } else {
+            next(null, thunk());
+          }
         }
-      }
-    }, function(done) {
-      var self = this;
+      }, function(done) {
+        var self = this;
 
-      transformCache = newTransformCache;
-      setNewModuleData(moduleData).then(function() {
-        return readManagerTemplate();
-      }).then(function(mgrTemplate) {
-        rowBuffer.forEach(function(thunk) {
-          self.push(thunk());
-        });
+        setNewModuleData(moduleData, id).then(function() {
+          return readManagerTemplate();
+        }).then(function(mgrTemplate) {
+          rowBuffer.forEach(function(thunk) {
+            self.push(thunk());
+          });
 
-        managerRow.source = mgrTemplate
-          .replace('null/*!^^moduleMeta*/', JSON.stringify(moduleMeta))
-          .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
-          .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
-          .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
-          .replace('null/*!^^supportModes*/', JSON.stringify(supportModes))
-          .replace('null/*!^^ignoreUnaccepted*/', JSON.stringify(ignoreUnaccepted))
-          .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
-          .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
-          .replace('null/*!^^sioPath*/', JSON.stringify(sioPath))
-          .replace('null/*!^^incPath*/', JSON.stringify(incPath));
-        self.push(managerRow);
-      }).then(done, done);
-    }));
+          managerRow.source = mgrTemplate
+            .replace('null/*!^^moduleMeta*/', JSON.stringify(meta))
+            .replace('null/*!^^originalEntries*/', JSON.stringify(managerRow.originalEntries))
+            .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
+            .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
+            .replace('null/*!^^supportModes*/', JSON.stringify(supportModes))
+            .replace('null/*!^^ignoreUnaccepted*/', JSON.stringify(ignoreUnaccepted))
+            .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
+            .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
+            .replace('null/*!^^sioPath*/', JSON.stringify(sioPath))
+            .replace('null/*!^^incPath*/', JSON.stringify(incPath))
+            .replace('null/*!^^id*/', JSON.stringify(id));
+          self.push(managerRow);
+        }).then(done, done);
+      }));
+    }
   }
   setupPipelineMods();
 
