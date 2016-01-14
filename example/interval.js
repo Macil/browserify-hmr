@@ -1,3 +1,4 @@
+// Advanced HMR example using ud
 var ud = require('ud');
 
 var step = ud.defn(module, function() {

@@ -1,8 +1,8 @@
 //jshint ignore:start
 
-var React = require('react');
+import React from 'react';
 
-var Label = React.createClass({
+export default class Label extends React.Component {
   render() {
     return (
       <div className="commentBox">
@@ -10,5 +10,4 @@ var Label = React.createClass({
       </div>
     );
   }
-});
-export default Label;
+}
