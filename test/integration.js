@@ -254,7 +254,7 @@ describe('plugin (integration)', function() {
     ]);
   }));
 
-  it.only('self declining works', co.wrap(function*() {
+  it('self declining works', co.wrap(function*() {
     this.slow();this.timeout(5000);
     const index = path.join(dir, 'self-decline-index.js');
     const depA = path.join(dir, 'self-decline-dep-a.js');
