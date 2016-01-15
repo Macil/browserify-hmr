@@ -14,22 +14,24 @@
       "envify"
     ]
   },
-  "devDependencies": {
-    "babel-plugin-react-transform": "^1.1.1",
-    "browserify": "^11.1.0",
-    "browserify-hmr": "^0.3.0",
-    "http-server": "^0.8.0",
-    "react-transform-catch-errors": "^1.0.0",
-    "react-transform-hmr": "^1.0.0",
-    "redbox-react": "^1.1.1",
-    "watchify": "^3.4.0"
-  },
   "dependencies": {
-    "babel-runtime": "^5.8.24",
-    "babelify": "^6.3.0",
+    "babel-plugin-react-transform": "^2.0.0",
+    "babel-plugin-transform-runtime": "^6.4.3",
+    "babel-preset-es2015": "^6.3.13",
+    "babel-preset-react": "^6.3.13",
+    "babel-runtime": "^6.3.19",
+    "babelify": "^7.2.0",
+    "browserify": "^13.0.0",
+    "browserify-hmr": "^0.3.0",
     "envify": "^3.4.0",
+    "http-server": "^0.8.0",
     "jquery": "^2.1.4",
-    "react": "^0.13.3",
-    "ud": "^2.0.1"
+    "react": "^0.14.6",
+    "react-dom": "^0.14.6",
+    "react-transform-catch-errors": "^1.0.1",
+    "react-transform-hmr": "^1.0.1",
+    "redbox-react": "^1.2.0",
+    "ud": "^3.0.0",
+    "watchify": "^3.7.0"
   }
 }
