@@ -2,14 +2,14 @@
 
 var has = require('../lib/has');
 var StrSet = require('../lib/str-set');
-var forEach = require('lodash/forEach');
-var some = require('lodash/some');
-var map = require('lodash/map');
-var filter = require('lodash/filter');
-var zipObject = require('lodash/zipObject');
-var forOwn = require('lodash/forOwn');
-var mapValues = require('lodash/mapValues');
-var assign = require('lodash/assign');
+var forEach = require('lodash/collection/forEach');
+var some = require('lodash/collection/some');
+var map = require('lodash/collection/map');
+var filter = require('lodash/collection/filter');
+var zipObject = require('lodash/array/zipObject');
+var forOwn = require('lodash/object/forOwn');
+var mapValues = require('lodash/object/mapValues');
+var assign = require('lodash/object/assign');
 
 function emitError(err) {
   setTimeout(function() {
