@@ -11,7 +11,9 @@ var fs = require('fs');
 var _ = require('lodash');
 var RSVP = require('rsvp');
 var readFile = RSVP.denodeify(fs.readFile);
+var findPort = RSVP.denodeify(require('find-port'));
 var has = require('./lib/has');
+
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -129,7 +131,7 @@ module.exports = function(bundle, opts) {
       } else {
         resolve();
       }
-    }).then(function(){
+    }).then(findPort(port)).then(function(port){
       server.send({
         type: 'config',
         hostname: hostname,
