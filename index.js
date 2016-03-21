@@ -12,6 +12,7 @@ var _ = require('lodash');
 var RSVP = require('rsvp');
 var readFile = RSVP.denodeify(fs.readFile);
 var has = require('./lib/has');
+var JSONStream = require('JSONStream');
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -97,9 +98,20 @@ module.exports = function(bundle, opts) {
 
   var server;
   var nextServerConfirm = RSVP.defer();
+  function sendToServer(data) {
+    server.stdio[3].write(JSON.stringify(data));
+  }
   var runServer = _.once(function() {
-    server = cproc.fork(__dirname+'/socket-server.js');
-    server.on('message', function(msg) {
+    // Start a new process with an extra socket opened to it.
+    // See https://github.com/nodejs/node-v0.x-archive/issues/5727 for a
+    // description. It's faster than using `process.send`.
+    server = cproc.spawn(
+      process.argv[0],
+      [__dirname+'/socket-server.js'],
+      { stdio: ['inherit','inherit','inherit','pipe'] }
+    );
+    var jsonPipe = server.stdio[3].pipe(JSONStream.parse());
+    jsonPipe.on('data', function(msg) {
       if (msg.type === 'confirmNewModuleData') {
         nextServerConfirm.resolve();
         nextServerConfirm = RSVP.defer();
@@ -107,7 +119,7 @@ module.exports = function(bundle, opts) {
         console.warn('[HMR builder] Unknown message type from server:', msg.type);
       }
     });
-    server.on('disconnect', function() {
+    jsonPipe.on('end', function() {
       em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
     return new RSVP.Promise(function(resolve, reject) {
@@ -130,7 +142,7 @@ module.exports = function(bundle, opts) {
         resolve();
       }
     }).then(function(){
-      server.send({
+      sendToServer({
         type: 'config',
         hostname: hostname,
         port: port,
@@ -169,7 +181,7 @@ module.exports = function(bundle, opts) {
         })
         .value();
       currentModuleData = moduleData;
-      server.send({
+      sendToServer({
         type: 'setNewModuleData',
         newModuleData: newModuleData,
         removedModules: removedModules

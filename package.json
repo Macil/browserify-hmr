@@ -4,6 +4,7 @@
   "description": "Hot Module Replacement plugin for Browserify",
   "main": "index.js",
   "dependencies": {
+    "JSONStream": "^1.1.1",
     "convert-source-map": "^1.1.1",
     "express": "^4.13.3",
     "lodash": "^4.0.0",
