@@ -160,7 +160,7 @@ module.exports = function(bundle, opts) {
             deps: pair[1].deps
           }];
         })
-        .zipObject()
+        .fromPairs()
         .value();
       var removedModules = _.chain(currentModuleData)
         .keys()
