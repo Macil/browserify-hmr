@@ -181,9 +181,19 @@ module.exports = function(bundle, opts) {
         })
         .value();
       currentModuleData = moduleData;
+
+      // Don't send all of the module data over at once. Send it piece by
+      // piece. The socket server won't apply the changes until it gets the
+      // type:"removedModules" message.
+      Object.keys(newModuleData).forEach(function(name) {
+        sendToServer({
+          type: 'newModule',
+          name: name,
+          data: newModuleData[name]
+        });
+      });
       sendToServer({
-        type: 'setNewModuleData',
-        newModuleData: newModuleData,
+        type: 'removedModules',
         removedModules: removedModules
       });
       return nextServerConfirm.promise;

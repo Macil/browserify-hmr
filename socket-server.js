@@ -50,29 +50,38 @@ var runServer = _.once(function() {
 });
 
 function setNewModuleData(newModuleData, removedModules) {
-  runServer();
-  _.assign(currentModuleData, newModuleData);
-  removedModules.forEach(function(name) {
-    delete currentModuleData[name];
-  });
-  if (Object.keys(newModuleData).length || removedModules.length) {
-    log('Emitting updates');
-    io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-  }
 }
 
 function sendToParent(data) {
   parent.write(JSON.stringify(data));
 }
 
+var uncommittedNewModuleData = {};
+
 parentJson.on('data', function(msg) {
   if (msg.type === 'config') {
     hostname = msg.hostname;
     port = msg.port;
     tlsoptions = msg.tlsoptions;
-  } else if (msg.type === 'setNewModuleData') {
+  } else if (msg.type === 'newModule') {
+    uncommittedNewModuleData[msg.name] = msg.data;
+  } else if (msg.type === 'removedModules') {
     sendToParent({type: 'confirmNewModuleData'});
-    setNewModuleData(msg.newModuleData, msg.removedModules);
+    _.assign(currentModuleData, uncommittedNewModuleData);
+    runServer();
+
+    msg.removedModules.forEach(function(name) {
+      delete currentModuleData[name];
+    });
+    if (Object.keys(uncommittedNewModuleData).length || msg.removedModules.length) {
+      log('Emitting updates');
+      io.emit('new modules', {
+        newModuleData: uncommittedNewModuleData,
+        removedModules: msg.removedModules
+      });
+    }
+
+    uncommittedNewModuleData = {};
   } else {
     log('Unknow message type', msg.type);
   }
