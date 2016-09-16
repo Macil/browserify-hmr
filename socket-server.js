@@ -89,6 +89,6 @@ parentReadline.on('line', function(line) {
     log('Unknow message type', msg.type);
   }
 });
-parentReadline.on('end', function() {
+parent.on('finish', function() {
   process.exit(0);
 });

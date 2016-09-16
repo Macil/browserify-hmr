@@ -132,7 +132,7 @@ module.exports = function(bundle, opts) {
         console.warn('[HMR builder] Unknown message type from server:', msg.type);
       }
     });
-    childReadline.on('end', function() {
+    server.stdio[3].on('finish', function() {
       em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
     return new RSVP.Promise(function(resolve, reject) {
