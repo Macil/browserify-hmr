@@ -1,6 +1,6 @@
 {
   "name": "browserify-hmr",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Hot Module Replacement plugin for Browserify",
   "main": "index.js",
   "dependencies": {
@@ -21,8 +21,8 @@
     "babel-register": "^6.4.3",
     "browserify": "^13.0.0",
     "co": "^4.6.0",
-    "fs-extra": "^0.26.4",
-    "mocha": "^2.3.4",
+    "fs-extra": "^0.30.0",
+    "mocha": "^3.0.2",
     "rimraf": "^2.4.2"
   },
   "scripts": {

@@ -7,6 +7,9 @@ import rmrf from './lib/rmrf';
 import copy from './lib/copy';
 
 describe('plugin (integration)', function() {
+  this.slow(5000);
+  this.timeout(5000);
+
   let dir = null;
 
   beforeEach(co.wrap(function*() {
@@ -20,7 +23,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('basic case works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'basic-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -44,7 +46,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('self accepting works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'self-index.js');
     const dep = path.join(dir, 'self-dep.js');
     const bundle = path.join(dir, 'bundle.js');
@@ -67,7 +68,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('multiple bundles work', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     // run the self-accepter initial bundle, then the basic case initial
     // bundle, then update the basic case bundle and make sure that works.
 
@@ -113,7 +113,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('deep accepting works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'deep-index.js');
     const depA = path.join(dir, 'deep-dep-a.js');
     const depB = path.join(dir, 'deep-dep-b.js');
@@ -138,7 +137,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('new dependency works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'new-index.js');
     const depA = path.join(dir, 'new-dep-a.js');
     const depB = path.join(dir, 'new-dep-b.js');
@@ -163,7 +161,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('remove dependency works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'remove-index.js');
     const depA = path.join(dir, 'remove-dep-a.js');
     const depB = path.join(dir, 'remove-dep-b.js');
@@ -188,7 +185,6 @@ describe('plugin (integration)', function() {
   }));
 
   it('setUpdateMode works', co.wrap(function*() {
-    this.slow();this.timeout(5000);
     const index = path.join(dir, 'setUpdateMode-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
