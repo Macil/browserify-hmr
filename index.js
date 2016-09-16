@@ -331,16 +331,16 @@ module.exports = function(bundle, opts) {
         });
 
         managerRow.source = mgrTemplate
-          .replace('null/*!^^moduleMeta*/', JSON.stringify(moduleMeta))
-          .replace('null/*!^^originalEntries*/', JSON.stringify(originalEntries))
-          .replace('null/*!^^updateUrl*/', JSON.stringify(updateUrl))
-          .replace('null/*!^^updateMode*/', JSON.stringify(updateMode))
-          .replace('null/*!^^supportModes*/', JSON.stringify(supportModes))
-          .replace('null/*!^^ignoreUnaccepted*/', JSON.stringify(ignoreUnaccepted))
-          .replace('null/*!^^updateCacheBust*/', JSON.stringify(updateCacheBust))
-          .replace('null/*!^^bundleKey*/', JSON.stringify(bundleKey))
-          .replace('null/*!^^sioPath*/', JSON.stringify(sioPath))
-          .replace('null/*!^^incPath*/', JSON.stringify(incPath));
+          .replace('null/*!^^moduleMeta*/', _.constant(JSON.stringify(moduleMeta)))
+          .replace('null/*!^^originalEntries*/', _.constant(JSON.stringify(originalEntries)))
+          .replace('null/*!^^updateUrl*/', _.constant(JSON.stringify(updateUrl)))
+          .replace('null/*!^^updateMode*/', _.constant(JSON.stringify(updateMode)))
+          .replace('null/*!^^supportModes*/', _.constant(JSON.stringify(supportModes)))
+          .replace('null/*!^^ignoreUnaccepted*/', _.constant(JSON.stringify(ignoreUnaccepted)))
+          .replace('null/*!^^updateCacheBust*/', _.constant(JSON.stringify(updateCacheBust)))
+          .replace('null/*!^^bundleKey*/', _.constant(JSON.stringify(bundleKey)))
+          .replace('null/*!^^sioPath*/', _.constant(JSON.stringify(sioPath)))
+          .replace('null/*!^^incPath*/', _.constant(JSON.stringify(incPath)));
         self.push(managerRow);
       }).then(done, done);
     }));
