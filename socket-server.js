@@ -1,24 +1,32 @@
 'use strict';
 
+var net = require('net');
 var _ = require('lodash');
 var express = require('express');
 var http = require('http');
 var https = require('https');
 var socketio = require('socket.io');
 var has = require('./lib/has');
+var readline = require('readline');
 
 function log() {
   console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
 }
 
+var parent = new net.Socket({fd: 3});
+var parentReadline = readline.createInterface({
+  input: parent,
+  output: process.stdout,
+  terminal: false
+});
+
 var hostname, port, tlsoptions;
-var io;
 var currentModuleData = {};
 
 var runServer = _.once(function() {
   var app = express();
   var server = tlsoptions ? https.Server(tlsoptions, app) : http.Server(app);
-  io = socketio(server);
+  var io = socketio(server);
   io.on('connection', function(socket) {
     socket.on('sync', function(syncMsg) {
       log('User connected, syncing');
@@ -43,32 +51,44 @@ var runServer = _.once(function() {
   server.listen(port, hostname, function() {
     log('Listening on '+hostname+':'+port);
   });
+  return io;
 });
 
-function setNewModuleData(newModuleData, removedModules) {
-  runServer();
-  _.assign(currentModuleData, newModuleData);
-  removedModules.forEach(function(name) {
-    delete currentModuleData[name];
-  });
-  if (Object.keys(newModuleData).length || removedModules.length) {
-    log('Emitting updates');
-    io.emit('new modules', {newModuleData: newModuleData, removedModules: removedModules});
-  }
+function sendToParent(data) {
+  parent.write(JSON.stringify(data)+'\n');
 }
 
-process.on('message', function(msg) {
+var uncommittedNewModuleData = {};
+
+parentReadline.on('line', function(line) {
+  var msg = JSON.parse(line);
   if (msg.type === 'config') {
     hostname = msg.hostname;
     port = msg.port;
     tlsoptions = msg.tlsoptions;
-  } else if (msg.type === 'setNewModuleData') {
-    process.send({type: 'confirmNewModuleData'});
-    setNewModuleData(msg.newModuleData, msg.removedModules);
+  } else if (msg.type === 'newModule') {
+    uncommittedNewModuleData[msg.name] = msg.data;
+  } else if (msg.type === 'removedModules') {
+    sendToParent({type: 'confirmNewModuleData'});
+    _.assign(currentModuleData, uncommittedNewModuleData);
+    var io = runServer();
+
+    msg.removedModules.forEach(function(name) {
+      delete currentModuleData[name];
+    });
+    if (Object.keys(uncommittedNewModuleData).length || msg.removedModules.length) {
+      log('Emitting updates');
+      io.emit('new modules', {
+        newModuleData: uncommittedNewModuleData,
+        removedModules: msg.removedModules
+      });
+    }
+
+    uncommittedNewModuleData = {};
   } else {
     log('Unknow message type', msg.type);
   }
 });
-process.on('disconnect', function() {
+parentReadline.on('end', function() {
   process.exit(0);
 });
