@@ -13,6 +13,7 @@ var RSVP = require('rsvp');
 var readFile = RSVP.denodeify(fs.readFile);
 var has = require('./lib/has');
 var readline = require('readline');
+var synchd = require('synchd');
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -97,6 +98,7 @@ module.exports = function(bundle, opts) {
   var useLocalSocketServer = !noServe && _.includes(supportModes, 'websocket');
 
   var server;
+  var serverCommLock = {};
   var nextServerConfirm = RSVP.defer();
   function sendToServer(data) {
     return new RSVP.Promise(function(resolve, reject) {
@@ -195,23 +197,28 @@ module.exports = function(bundle, opts) {
         .value();
       currentModuleData = moduleData;
 
-      // Don't send all of the module data over at once. Send it piece by
-      // piece. The socket server won't apply the changes until it gets the
-      // type:"removedModules" message.
-      Object.keys(newModuleData).reduce(function(promise, name) {
-        return promise.then(function() {
+      // This following block talking to the server should execute serially,
+      // never concurrently.
+      return synchd.synchd(serverCommLock, function() {
+        // Don't send all of the module data over at once. Send it piece by
+        // piece. The socket server won't apply the changes until it gets the
+        // type:"removedModules" message.
+        return Object.keys(newModuleData).reduce(function(promise, name) {
+          return promise.then(function() {
+            return sendToServer({
+              type: 'newModule',
+              name: name,
+              data: newModuleData[name]
+            });
+          });
+        }, RSVP.Promise.resolve()).then(function() {
           return sendToServer({
-            type: 'newModule',
-            name: name,
-            data: newModuleData[name]
+            type: 'removedModules',
+            removedModules: removedModules
           });
         });
-      }, RSVP.Promise.resolve()).then(function() {
-        return sendToServer({
-          type: 'removedModules',
-          removedModules: removedModules
-        });
       }).then(function() {
+        // Waiting for the response doesn't need to be in the exclusive section.
         return nextServerConfirm.promise;
       });
     });
