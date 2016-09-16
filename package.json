@@ -1,6 +1,6 @@
 {
   "name": "browserify-hmr",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Hot Module Replacement plugin for Browserify",
   "main": "index.js",
   "dependencies": {
