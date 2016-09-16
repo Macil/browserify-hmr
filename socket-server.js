@@ -7,22 +7,26 @@ var http = require('http');
 var https = require('https');
 var socketio = require('socket.io');
 var has = require('./lib/has');
-var JSONStream = require('JSONStream');
+var readline = require('readline');
 
 function log() {
   console.log.apply(console, [new Date().toTimeString(), '[HMR]'].concat(_.toArray(arguments)));
 }
 
 var parent = new net.Socket({fd: 3});
-var parentJson = parent.pipe(JSONStream.parse());
+var parentReadline = readline.createInterface({
+  input: parent,
+  output: process.stdout,
+  terminal: false
+});
+
 var hostname, port, tlsoptions;
-var io;
 var currentModuleData = {};
 
 var runServer = _.once(function() {
   var app = express();
   var server = tlsoptions ? https.Server(tlsoptions, app) : http.Server(app);
-  io = socketio(server);
+  var io = socketio(server);
   io.on('connection', function(socket) {
     socket.on('sync', function(syncMsg) {
       log('User connected, syncing');
@@ -47,18 +51,17 @@ var runServer = _.once(function() {
   server.listen(port, hostname, function() {
     log('Listening on '+hostname+':'+port);
   });
+  return io;
 });
 
-function setNewModuleData(newModuleData, removedModules) {
-}
-
 function sendToParent(data) {
-  parent.write(JSON.stringify(data));
+  parent.write(JSON.stringify(data)+'\n');
 }
 
 var uncommittedNewModuleData = {};
 
-parentJson.on('data', function(msg) {
+parentReadline.on('line', function(line) {
+  var msg = JSON.parse(line);
   if (msg.type === 'config') {
     hostname = msg.hostname;
     port = msg.port;
@@ -68,7 +71,7 @@ parentJson.on('data', function(msg) {
   } else if (msg.type === 'removedModules') {
     sendToParent({type: 'confirmNewModuleData'});
     _.assign(currentModuleData, uncommittedNewModuleData);
-    runServer();
+    var io = runServer();
 
     msg.removedModules.forEach(function(name) {
       delete currentModuleData[name];
@@ -86,6 +89,6 @@ parentJson.on('data', function(msg) {
     log('Unknow message type', msg.type);
   }
 });
-parentJson.on('end', function() {
+parentReadline.on('end', function() {
   process.exit(0);
 });

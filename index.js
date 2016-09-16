@@ -12,7 +12,7 @@ var _ = require('lodash');
 var RSVP = require('rsvp');
 var readFile = RSVP.denodeify(fs.readFile);
 var has = require('./lib/has');
-var JSONStream = require('JSONStream');
+var readline = require('readline');
 
 function hashStr(str) {
   var hasher = crypto.createHash('sha256');
@@ -99,7 +99,15 @@ module.exports = function(bundle, opts) {
   var server;
   var nextServerConfirm = RSVP.defer();
   function sendToServer(data) {
-    server.stdio[3].write(JSON.stringify(data));
+    return new RSVP.Promise(function(resolve, reject) {
+      server.stdio[3].write(JSON.stringify(data), function(err) {
+        if (err) return reject(err);
+        server.stdio[3].write('\n', function(err) {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
   }
   var runServer = _.once(function() {
     // Start a new process with an extra socket opened to it.
@@ -110,8 +118,13 @@ module.exports = function(bundle, opts) {
       [__dirname+'/socket-server.js'],
       { stdio: ['inherit','inherit','inherit','pipe'] }
     );
-    var jsonPipe = server.stdio[3].pipe(JSONStream.parse());
-    jsonPipe.on('data', function(msg) {
+    var childReadline = readline.createInterface({
+      input: server.stdio[3],
+      output: process.stdout,
+      terminal: false
+    });
+    childReadline.on('line', function(line) {
+      var msg = JSON.parse(line);
       if (msg.type === 'confirmNewModuleData') {
         nextServerConfirm.resolve();
         nextServerConfirm = RSVP.defer();
@@ -119,7 +132,7 @@ module.exports = function(bundle, opts) {
         console.warn('[HMR builder] Unknown message type from server:', msg.type);
       }
     });
-    jsonPipe.on('end', function() {
+    childReadline.on('end', function() {
       em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
     return new RSVP.Promise(function(resolve, reject) {
@@ -142,7 +155,7 @@ module.exports = function(bundle, opts) {
         resolve();
       }
     }).then(function(){
-      sendToServer({
+      return sendToServer({
         type: 'config',
         hostname: hostname,
         port: port,
@@ -185,18 +198,22 @@ module.exports = function(bundle, opts) {
       // Don't send all of the module data over at once. Send it piece by
       // piece. The socket server won't apply the changes until it gets the
       // type:"removedModules" message.
-      Object.keys(newModuleData).forEach(function(name) {
-        sendToServer({
-          type: 'newModule',
-          name: name,
-          data: newModuleData[name]
+      Object.keys(newModuleData).reduce(function(promise, name) {
+        return promise.then(function() {
+          return sendToServer({
+            type: 'newModule',
+            name: name,
+            data: newModuleData[name]
+          });
         });
+      }, RSVP.Promise.resolve()).then(function() {
+        return sendToServer({
+          type: 'removedModules',
+          removedModules: removedModules
+        });
+      }).then(function() {
+        return nextServerConfirm.promise;
       });
-      sendToServer({
-        type: 'removedModules',
-        removedModules: removedModules
-      });
-      return nextServerConfirm.promise;
     });
   }
 
