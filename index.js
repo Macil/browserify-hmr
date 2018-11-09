@@ -274,7 +274,15 @@ module.exports = function(bundle, opts) {
       }
     }
 
-    bundle.pipeline.get('deps').push(through.obj(function(row, enc, next) {
+    var depPipeline = bundle.pipeline.get('deps');
+
+    /* This emulates Webpack's module.id, as needed to make eg. react-hot-loader work. */
+    depPipeline.push(through.obj(function(row, enc, next) {
+      row.source = "module.id = " + JSON.stringify(row.id) + "; " + row.source;
+      next(null, row);
+    }));
+
+    depPipeline.push(through.obj(function(row, enc, next) {
       if (row.file !== hmrManagerFilename) {
         makeModuleMetaEntry(fileKey(row.file));
         _.forOwn(row.deps, function(name, ref) {
