@@ -278,7 +278,11 @@ module.exports = function(bundle, opts) {
 
     /* This emulates Webpack's module.id, as needed to make eg. react-hot-loader work. */
     depPipeline.push(through.obj(function(row, enc, next) {
-      row.source = "module.id = " + JSON.stringify(row.id) + "; " + row.source;
+      /* Prevent duplicate addition of the module.id prefix (which breaks hot-reload hashing) */
+      if (row.source.length < 12 || row.source.slice(0, 12) !== "module.id = ") {
+        row.source = "module.id = " + JSON.stringify(row.id) + "; " + row.source;
+      }
+
       next(null, row);
     }));
 
