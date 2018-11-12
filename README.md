@@ -11,7 +11,8 @@ for you!
 ```sh
 git clone https://github.com/AgentME/browserify-hmr.git
 cd browserify-hmr/example
-npm i && npm start
+yarn
+yarn start
 ```
 
 Open [http://localhost:8080/](http://localhost:8080/) and try updating
@@ -47,7 +48,7 @@ is called.
 Add the browserify-hmr plugin to your watchify call:
 
 ```sh
-npm i browserify-hmr
+yarn add --dev browserify-hmr
 watchify -p browserify-hmr index.js -o bundle.js
 ```
 
