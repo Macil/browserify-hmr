@@ -116,7 +116,6 @@ function main(
         lastScriptData = data;
         localHmr.newLoad = null;
         try {
-          //jshint evil:true
           if (bundle__filename || bundle__dirname) {
             new Function('require', '__filename', '__dirname', data)(require, bundle__filename, bundle__dirname);
           } else {
@@ -163,7 +162,6 @@ function main(
       // then we iterate over them too.
       for (var i=0; i<outdated.length; i++) {
         name = outdated[i];
-        //jshint -W083
         if (has(runtimeModuleInfo, name)) {
           runtimeModuleInfo[name].parents.forEach(function(parentName) {
             if (
@@ -277,7 +275,6 @@ function main(
       var selfAccepters = [];
       for (i=0, len=acceptedUpdates.length; i<len; i++) {
         an = acceptedUpdates[i];
-        //jshint -W083
         if (!has(runtimeModuleInfo, an)) {
           // new modules
           runtimeModuleInfo[an] = {
@@ -469,7 +466,6 @@ function main(
           // newModuleIndexesToNames are populated.
           var newModuleFunction = (function() {
             var fn;
-            //jshint evil:true
             if (bundle__filename || bundle__dirname) {
               fn = new Function('require', 'module', 'exports', '_u1'+rid, '_u2'+rid, '__u3'+rid, '__u4'+rid, '__filename', '__dirname', value.source);
               return function(require, module, exports, _u1, _u2, _u3, _u4) {
