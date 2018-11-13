@@ -1,7 +1,7 @@
 # Browserify-HMR
 
 This an implementation of Webpack's [Hot Module Replacement
-API](https://webpack.github.io/docs/hot-module-replacement.html) as a plugin for
+API](https://webpack.js.org/api/hot-module-replacement/) as a plugin for
 Browserify. This project seems to work in many cases, but it is still early in
 development and likely has some bugs at the moment. Let me know how it works
 for you!
