@@ -547,6 +547,9 @@ function main(
       newLoad: null,
 
       initModule: function(name, module) {
+        // Set module.id for react-hot-loader support.
+        module.id = name;
+
         runtimeModuleInfo[name].module = module;
         module.hot = {
           accept: function(deps, cb) {
