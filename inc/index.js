@@ -369,6 +369,8 @@ function main(
         }
       });
 
+      localHmr.setStatus('apply');
+
       localHmr.setStatus('idle');
       cb(errCanWait, acceptedUpdates);
     };
