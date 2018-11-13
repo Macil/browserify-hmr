@@ -9,7 +9,7 @@ for you!
 ## Quick Example
 
 ```sh
-git clone https://github.com/AgentME/browserify-hmr.git
+git clone https://github.com/Macil/browserify-hmr.git
 cd browserify-hmr/example
 yarn
 yarn start
@@ -28,7 +28,7 @@ module is going to be updated.
 However, using the HMR API directly in application code is not always the best
 route. Code transforms and libraries like
 [react-transform-hmr](https://github.com/gaearon/react-transform-hmr) and
-[ud](https://github.com/AgentME/ud) can help do common tasks or entirely
+[ud](https://github.com/Macil/ud) can help do common tasks or entirely
 automate making certain types of code be hot replaceable.
 
 In addition to the `module.hot.*` functions from the Webpack Hot Module
@@ -183,10 +183,10 @@ if (module.hot) {
 
 ## See Also
 
-* [react-hot-transform](https://github.com/AgentME/react-hot-transform)
+* [react-hot-transform](https://github.com/Macil/react-hot-transform)
   automatically makes React code live-updatable.
-* [ud](https://github.com/AgentME/ud) and
-  [ud-kefir](https://github.com/AgentME/ud-kefir) are small simple utilities
+* [ud](https://github.com/Macil/ud) and
+  [ud-kefir](https://github.com/Macil/ud-kefir) are small simple utilities
   for declaring data and code as live-updatable.
 
 ## Planned Work

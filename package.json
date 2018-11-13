@@ -30,10 +30,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AgentME/browserify-hmr.git"
+    "url": "https://github.com/Macil/browserify-hmr.git"
   },
   "bugs": {
-    "url": "https://github.com/AgentME/browserify-hmr/issues"
+    "url": "https://github.com/Macil/browserify-hmr/issues"
   },
   "keywords": [
     "browserify",
