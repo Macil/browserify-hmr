@@ -183,8 +183,8 @@ if (module.hot) {
 
 ## See Also
 
-* [react-hot-transform](https://github.com/Macil/react-hot-transform)
-  automatically makes React code live-updatable.
+* [react-hot-loader](https://github.com/gaearon/react-hot-loader)
+  can be used to make React code live-update-able.
 * [ud](https://github.com/Macil/ud) and
   [ud-kefir](https://github.com/Macil/ud-kefir) are small simple utilities
   for declaring data and code as live-updatable.

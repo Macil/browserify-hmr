@@ -1,6 +1,7 @@
 import React from 'react';
+import { hot } from 'react-hot-loader';
 
-export default class Label extends React.Component {
+class Label extends React.Component {
   render() {
     return (
       <div className="commentBox">
@@ -9,3 +10,5 @@ export default class Label extends React.Component {
     );
   }
 }
+
+export default hot(module)(Label);

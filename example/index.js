@@ -1,13 +1,27 @@
-import $ from 'jquery';
+import '@babel/polyfill';
+
 import React from 'react';
 import ReactDOM from 'react-dom';
-import Label from './label.jsx';
+import Label from './Label.jsx';
 
 require('./interval')();
 
-$(document).ready(() => {
+const onReady = new Promise(resolve => {
+  if (document.readyState === 'complete') {
+    resolve();
+  } else {
+    document.addEventListener('DOMContentLoaded', resolve, false);
+    window.addEventListener('load', resolve, false);
+  }
+});
+
+onReady.then(main).catch(e => {
+  console.error(e);
+});
+
+function main() {
   ReactDOM.render(
-    React.createElement(Label, null),
+    <Label />,
     document.getElementById('main')
   );
-});
+}
