@@ -1031,9 +1031,9 @@ browserify-des@^1.0.0:
     safe-buffer "^5.1.2"
 
 browserify-hmr@^0.3.0:
-  version "0.3.6"
-  resolved "https://registry.yarnpkg.com/browserify-hmr/-/browserify-hmr-0.3.6.tgz#06ad2b565b73d7c401f087a39c3de65103471a09"
-  integrity sha512-mqc4MIApAnv846HC/jxivQAOIn9hk7YhOe/OMvpIIok0BYZVnpJqAfVblMHCuNplm+c90+JduMZvk0u3BTXwrA==
+  version "0.3.7"
+  resolved "https://registry.yarnpkg.com/browserify-hmr/-/browserify-hmr-0.3.7.tgz#019c12fe287bb742d4f9e21fc5eac60c4f4240bf"
+  integrity sha512-QxtisTh0OLoi+2rU9XtX38/KYL7Jy7S8A8Ko22Z8tZ9pFY7EN7pCFIzk8iThvaIudf6ejQhWHlUL02Hs+41sbQ==
   dependencies:
     convert-source-map "^1.1.1"
     express "^4.13.3"
