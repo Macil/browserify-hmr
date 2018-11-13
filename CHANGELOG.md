@@ -1,3 +1,8 @@
+## 0.3.7 (2018-11-12)
+
+* Implement `module.id` for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
+* Implement 'apply' HMR status for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
+
 ## 0.3.6 (2017-11-17)
 
 * Updated socket.io version used. [#38](https://github.com/Macil/browserify-hmr/pull/38)
