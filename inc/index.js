@@ -425,6 +425,9 @@ function main(
         isAcceptingMessages = true;
         queuedUpdateMessages = [];
       });
+      socket.on('error', function(err) {
+        console.error('[HMR] Websocket error: ' + err);
+      });
       socket.on('disconnect', function() {
         console.log('[HMR] Websocket connection lost.');
       });
