@@ -12,7 +12,7 @@
     "socket.io-client": "^2.0.4",
     "source-map": "^0.6.1",
     "synchd": "^1.0.0",
-    "through2": "^2.0.0"
+    "through2": "^3.0.1"
   },
   "devDependencies": {
     "babel-polyfill": "^6.3.14",
@@ -20,7 +20,6 @@
     "babel-preset-stage-3": "^6.3.13",
     "babel-register": "^6.4.3",
     "browserify": "^16.2.3",
-    "co": "^4.6.0",
     "fs-extra": "^4.0.2",
     "mocha": "^5.2.0",
     "rimraf": "^2.4.2"

@@ -1,5 +1,4 @@
 const path = require('path');
-const co = require('co');
 import run from './lib/run';
 import delay from './lib/delay';
 import tmpDir from './lib/tmp-dir';
@@ -12,62 +11,62 @@ describe('plugin (integration)', function() {
 
   let dir = null;
 
-  beforeEach(co.wrap(function*() {
-    dir = yield tmpDir();
-  }));
-  afterEach(co.wrap(function*() {
+  beforeEach(async () => {
+    dir = await tmpDir();
+  });
+  afterEach(async () => {
     if (dir) {
-      yield rmrf(dir);
+      await rmrf(dir);
     }
     dir = null;
-  }));
+  });
 
-  it('basic case works', co.wrap(function*() {
+  it('basic case works', async () => {
     const index = path.join(dir, 'basic-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/basic-index.js', index);
-    yield copy('./test/data/basic-dep1.js', dep);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/basic-index.js', index);
+    await copy('./test/data/basic-dep1.js', dep);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/basic-dep2.js', dep);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/basic-dep2.js', dep);
+        await run('./node_modules/.bin/browserify', [
           // test --full-paths too
           '--node','--full-paths','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('self accepting works', co.wrap(function*() {
+  it('self accepting works', async () => {
     const index = path.join(dir, 'self-index.js');
     const dep = path.join(dir, 'self-dep.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/self-index.js', index);
-    yield copy('./test/data/self-dep1.js', dep);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/self-index.js', index);
+    await copy('./test/data/self-dep1.js', dep);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/self-dep2.js', dep);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/self-dep2.js', dep);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('multiple bundles work', co.wrap(function*() {
+  it('multiple bundles work', async () => {
     // run the self-accepter initial bundle, then the basic case initial
     // bundle, then update the basic case bundle and make sure that works.
 
@@ -79,130 +78,130 @@ describe('plugin (integration)', function() {
     const basicDep = path.join(dir, 'basic-dep.js');
     const basicBundle = path.join(dir, 'basic-bundle.js');
 
-    yield Promise.all([
-      co(function*() {
-        yield copy('./test/data/self-index.js', selfIndex);
-        yield copy('./test/data/self-dep1.js', selfDep);
-        yield run('./node_modules/.bin/browserify', [
+    await Promise.all([
+      (async () => {
+        await copy('./test/data/self-index.js', selfIndex);
+        await copy('./test/data/self-dep1.js', selfDep);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs','-k','self',']',selfIndex,'-o',selfBundle
         ]);
-      }),
-      co(function*() {
-        yield copy('./test/data/basic-index.js', basicIndex);
-        yield copy('./test/data/basic-dep1.js', basicDep);
-        yield run('./node_modules/.bin/browserify', [
+      })(),
+      (async () => {
+        await copy('./test/data/basic-index.js', basicIndex);
+        await copy('./test/data/basic-dep1.js', basicDep);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
         ]);
-      })
+      })()
     ]);
 
-    yield Promise.all([
+    await Promise.all([
       run('node', [
         '-e',
         `require(${JSON.stringify(selfBundle)}); require(${JSON.stringify(basicBundle)});`
       ]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/basic-dep2.js', basicDep);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/basic-dep2.js', basicDep);
+        await run('./node_modules/.bin/browserify', [
           // test --full-paths too
           '--node','--full-paths','-p','[','./index','-m','fs','-k','basic',']',basicIndex,'-o',basicBundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('deep accepting works', co.wrap(function*() {
+  it('deep accepting works', async () => {
     const index = path.join(dir, 'deep-index.js');
     const depA = path.join(dir, 'deep-dep-a.js');
     const depB = path.join(dir, 'deep-dep-b.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/deep-index.js', index);
-    yield copy('./test/data/deep-dep-a.js', depA);
-    yield copy('./test/data/deep-dep-b1.js', depB);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/deep-index.js', index);
+    await copy('./test/data/deep-dep-a.js', depA);
+    await copy('./test/data/deep-dep-b1.js', depB);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/deep-dep-b2.js', depB);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/deep-dep-b2.js', depB);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('new dependency works', co.wrap(function*() {
+  it('new dependency works', async () => {
     const index = path.join(dir, 'new-index.js');
     const depA = path.join(dir, 'new-dep-a.js');
     const depB = path.join(dir, 'new-dep-b.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/new-index.js', index);
-    yield copy('./test/data/new-dep-a1.js', depA);
-    yield copy('./test/data/new-dep-b.js', depB);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/new-index.js', index);
+    await copy('./test/data/new-dep-a1.js', depA);
+    await copy('./test/data/new-dep-b.js', depB);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/new-dep-a2.js', depA);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/new-dep-a2.js', depA);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('remove dependency works', co.wrap(function*() {
+  it('remove dependency works', async () => {
     const index = path.join(dir, 'remove-index.js');
     const depA = path.join(dir, 'remove-dep-a.js');
     const depB = path.join(dir, 'remove-dep-b.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/remove-index.js', index);
-    yield copy('./test/data/remove-dep-a1.js', depA);
-    yield copy('./test/data/remove-dep-b.js', depB);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/remove-index.js', index);
+    await copy('./test/data/remove-dep-a1.js', depA);
+    await copy('./test/data/remove-dep-b.js', depB);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/remove-dep-a2.js', depA);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/remove-dep-a2.js', depA);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','fs',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 
-  it('setUpdateMode works', co.wrap(function*() {
+  it('setUpdateMode works', async () => {
     const index = path.join(dir, 'setUpdateMode-index.js');
     const dep = path.join(dir, 'basic-dep.js');
     const bundle = path.join(dir, 'bundle.js');
 
-    yield copy('./test/data/setUpdateMode-index.js', index);
-    yield copy('./test/data/basic-dep1.js', dep);
-    yield run('./node_modules/.bin/browserify', [
+    await copy('./test/data/setUpdateMode-index.js', index);
+    await copy('./test/data/basic-dep1.js', dep);
+    await run('./node_modules/.bin/browserify', [
       '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
     ]);
-    yield Promise.all([
+    await Promise.all([
       run('node', [bundle]),
-      co(function*() {
-        yield delay(200);
-        yield copy('./test/data/basic-dep2.js', dep);
-        yield run('./node_modules/.bin/browserify', [
+      (async () => {
+        await delay(200);
+        await copy('./test/data/basic-dep2.js', dep);
+        await run('./node_modules/.bin/browserify', [
           '--node','-p','[','./index','-m','none','--supportModes','[','fs',']',']',index,'-o',bundle
         ]);
-      })
+      })()
     ]);
-  }));
+  });
 });
