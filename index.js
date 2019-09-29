@@ -320,12 +320,12 @@ module.exports = function(bundle, opts) {
         } else {
           isNew = true;
           thunk = async () => {
-            var header = '_hmr['+JSON.stringify(bundleKey)+
+            const header = '_hmr['+JSON.stringify(bundleKey)+
               '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
-            var footer = '\n}).apply(this, arguments);\n';
+            const footer = '\n}).apply(this, arguments);\n';
 
-            var inputMapCV = convert.fromSource(row.source);
-            var inputMap;
+            const inputMapCV = convert.fromSource(row.source);
+            let inputMap;
             if (inputMapCV) {
               inputMap = inputMapCV.toObject();
               row.source = convert.removeComments(row.source);
@@ -333,13 +333,19 @@ module.exports = function(bundle, opts) {
               inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
             }
 
-            var node = new sm.SourceNode(null, null, null, [
-              new sm.SourceNode(null, null, null, header),
-              sm.SourceNode.fromStringWithSourceMap(row.source, new sm.SourceMapConsumer(inputMap)),
-              new sm.SourceNode(null, null, null, footer)
-            ]);
+            let result;
+            const sourceMapConsumer = await new sm.SourceMapConsumer(inputMap);
+            try {
+              const node = new sm.SourceNode(null, null, null, [
+                new sm.SourceNode(null, null, null, header),
+                sm.SourceNode.fromStringWithSourceMap(row.source, sourceMapConsumer),
+                new sm.SourceNode(null, null, null, footer)
+              ]);
 
-            var result = node.toStringWithSourceMap();
+              result = node.toStringWithSourceMap();
+            } finally {
+              sourceMapConsumer.destroy();
+            }
             row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
 
             newTransformCache[row.file] = {

@@ -10,7 +10,7 @@
     "rsvp": "^4.0.0",
     "socket.io": "^2.0.4",
     "socket.io-client": "^2.0.4",
-    "source-map": "^0.6.1",
+    "source-map": "^0.7.3",
     "synchd": "^1.0.0",
     "through2": "^3.0.1"
   },
