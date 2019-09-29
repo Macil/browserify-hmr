@@ -316,10 +316,10 @@ module.exports = function(bundle, opts) {
           isNew = false;
           row.source = transformCache[row.file].transformedSource;
           newTransformCache[row.file] = transformCache[row.file];
-          thunk = _.constant(row);
+          thunk = () => Promise.resolve(row);
         } else {
           isNew = true;
-          thunk = function() {
+          thunk = async () => {
             var header = '_hmr['+JSON.stringify(bundleKey)+
               '].initModule('+JSON.stringify(fileKey(row.file))+', module);\n(function(){\n';
             var footer = '\n}).apply(this, arguments);\n';
@@ -364,19 +364,21 @@ module.exports = function(bundle, opts) {
           rowBuffer.push(thunk);
           next(null);
         } else {
-          next(null, thunk());
+          thunk().then(thunkResult => {
+            next(null, thunkResult);
+          });
         }
       }
     }, function(done) {
-      var self = this;
+      const self = this;
 
       transformCache = newTransformCache;
-      setNewModuleData(moduleData).then(function() {
-        return readManagerTemplate();
-      }).then(function(mgrTemplate) {
-        rowBuffer.forEach(function(thunk) {
-          self.push(thunk());
-        });
+      setNewModuleData(moduleData).then(async () => {
+        const mgrTemplate = await readManagerTemplate();
+
+        for (const thunk of rowBuffer) {
+          self.push(await thunk());
+        }
 
         managerRow.source = mgrTemplate
           .replace('null/*!^^moduleMeta*/', _.constant(JSON.stringify(moduleMeta)))
