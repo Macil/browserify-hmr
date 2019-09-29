@@ -1,13 +1,13 @@
 ## 0.4.0 (2019-09-28)
 
 ### Breaking Changes
-* Browserify-HMR in websocket mode now checks that websocket connections are opened from a page from the configured hostname or localhost. This is done to prevent arbitrary webpages from telling your browser to connect to an instance of Browserify-HMR you're running. This check can be disabled with the `disableHostCheck` option.
-* Drop support for Node < 8.
+* Browserify-HMR in websocket mode now checks that websocket connections are opened from a page from the configured hostname or localhost. This is done to prevent arbitrary webpages from telling your browser to connect to an instance of Browserify-HMR you're running. This check can be disabled with the `disableHostCheck` option. [#45](https://github.com/Macil/browserify-hmr/pull/45)
+* Dropped support for Node < 8.
 
 ## 0.3.7 (2018-11-12)
 
-* Implement `module.id` for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
-* Implement 'apply' HMR status for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
+* Implemented `module.id` for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
+* Implemented 'apply' HMR status for [react-hot-loader](https://github.com/gaearon/react-hot-loader) support.
 
 ## 0.3.6 (2017-11-17)
 
