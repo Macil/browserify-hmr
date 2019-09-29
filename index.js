@@ -333,19 +333,18 @@ module.exports = function(bundle, opts) {
               inputMap = makeIdentitySourceMap(row.source, path.relative(basedir, row.file));
             }
 
-            let result;
-            const sourceMapConsumer = await new sm.SourceMapConsumer(inputMap);
-            try {
-              const node = new sm.SourceNode(null, null, null, [
-                new sm.SourceNode(null, null, null, header),
-                sm.SourceNode.fromStringWithSourceMap(row.source, sourceMapConsumer),
-                new sm.SourceNode(null, null, null, footer)
-              ]);
-
-              result = node.toStringWithSourceMap();
-            } finally {
-              sourceMapConsumer.destroy();
-            }
+            const result = await sm.SourceMapConsumer.with(
+              inputMap,
+              null,
+              async sourceMapConsumer => {
+                const node = new sm.SourceNode(null, null, null, [
+                  new sm.SourceNode(null, null, null, header),
+                  sm.SourceNode.fromStringWithSourceMap(row.source, sourceMapConsumer),
+                  new sm.SourceNode(null, null, null, footer)
+                ]);
+                return node.toStringWithSourceMap();
+              }
+            );
             row.source = result.code + convert.fromObject(result.map.toJSON()).toComment();
 
             newTransformCache[row.file] = {
