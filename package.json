@@ -20,9 +20,9 @@
     "babel-preset-stage-3": "^6.3.13",
     "babel-register": "^6.4.3",
     "browserify": "^16.2.3",
-    "fs-extra": "^4.0.2",
-    "mocha": "^5.2.0",
-    "rimraf": "^2.4.2"
+    "fs-extra": "^8.1.0",
+    "mocha": "^6.2.0",
+    "rimraf": "^3.0.0"
   },
   "scripts": {
     "test": "mocha"
