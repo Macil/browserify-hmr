@@ -102,7 +102,7 @@ module.exports = function(bundle, opts) {
   var serverCommLock = {};
   var nextServerConfirm = RSVP.defer();
   function sendToServer(data) {
-    return new RSVP.Promise(function(resolve, reject) {
+    return new Promise(function(resolve, reject) {
       server.stdio[3].write(JSON.stringify(data), function(err) {
         if (err) return reject(err);
         server.stdio[3].write('\n', function(err) {
@@ -138,7 +138,7 @@ module.exports = function(bundle, opts) {
     server.stdio[3].on('finish', function() {
       em.emit('error', new Error("Browserify-HMR lost connection to socket server"));
     });
-    return new RSVP.Promise(function(resolve, reject) {
+    return new Promise(function(resolve, reject) {
       var readJobs = [];
       if (cert) {
         readJobs.push(readFile(cert, 'utf8').then(function(data) {
@@ -153,7 +153,7 @@ module.exports = function(bundle, opts) {
         }));
       }
       if (readJobs.length) {
-        resolve(RSVP.Promise.all(readJobs));
+        resolve(Promise.all(readJobs));
       } else {
         resolve();
       }
@@ -172,7 +172,7 @@ module.exports = function(bundle, opts) {
 
   function setNewModuleData(moduleData) {
     if (!useLocalSocketServer) {
-      return RSVP.Promise.resolve();
+      return Promise.resolve();
     }
     return runServer().then(function() {
       var newModuleData = _.chain(moduleData)
@@ -213,7 +213,7 @@ module.exports = function(bundle, opts) {
               data: newModuleData[name]
             });
           });
-        }, RSVP.Promise.resolve()).then(function() {
+        }, Promise.resolve()).then(function() {
           return sendToServer({
             type: 'removedModules',
             removedModules: removedModules
