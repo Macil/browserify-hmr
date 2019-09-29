@@ -152,6 +152,11 @@ and update url, so you generally don't need to worry about this option.
 instead of any buffers inside of it. This option may not be given by the
 command line.
 
+`disableHostCheck` disables Origin and Host header checking when connecting
+to the server via WebSockets. By default it is set to `false` to 3rd party
+websites from connecting to a local websocket and leaking source code. For
+more information see (NPM Advisory 726)[https://www.npmjs.com/advisories/726].
+
 If you don't use the default websocket update mode, then you'll need to
 manually tell browserify-hmr when it should check for and apply updates. You
 can use code like the following somewhere in your project to poll for updates:

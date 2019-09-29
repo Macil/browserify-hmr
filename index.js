@@ -73,6 +73,7 @@ module.exports = function(bundle, opts) {
   var supportModes = (opts.supportModes && opts.supportModes._) || opts.supportModes || [];
   var noServe = boolOpt(readOpt(opts, 'noServe', null, false));
   var ignoreUnaccepted = boolOpt(readOpt(opts, 'ignoreUnaccepted', null, true));
+  var disableHostCheck = boolOpt(readOpt(opts, 'disableHostCheck', null, false));
 
   var basedir = opts.basedir !== undefined ? opts.basedir : process.cwd();
   var em = new EventEmitter();
@@ -159,6 +160,7 @@ module.exports = function(bundle, opts) {
     }).then(function(){
       return sendToServer({
         type: 'config',
+        disableHostCheck: disableHostCheck,
         hostname: hostname,
         port: port,
         tlsoptions: tlsoptions
