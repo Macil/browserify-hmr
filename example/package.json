@@ -22,12 +22,12 @@
     "@babel/preset-react": "^7.0.0",
     "babelify": "^10.0.0",
     "browserify": "^16.2.3",
-    "browserify-hmr": "^0.3.0",
+    "browserify-hmr": "file:../",
     "envify": "^4.1.0",
     "http-server": "^0.11.1",
     "react": "^16.6.1",
     "react-dom": "^16.6.1",
-    "react-hot-loader": "4.4.0-1",
+    "react-hot-loader": "^4.12.15",
     "ud": "^3.0.0",
     "watchify": "^3.7.0"
   }
