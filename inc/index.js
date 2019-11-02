@@ -553,7 +553,7 @@ function main(
 
       initModule: function(name, module) {
         // Set module.id for react-hot-loader support.
-        module.id = name;
+        module.id = moduleMeta[name] ? moduleMeta[name].index : name;
 
         runtimeModuleInfo[name].module = module;
         module.hot = {

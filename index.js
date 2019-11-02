@@ -227,7 +227,13 @@ module.exports = function(bundle, opts) {
   }
 
   function fileKey(filename) {
-    return path.relative(basedir, filename);
+    const relative = path.relative(basedir, filename);
+    if (/^[a-zA-Z0-9]/.test(relative)) {
+      // Example: return ./Label.jsx instead of Label.jsx - reverse module id
+      // lookup would not work with just Label.jsx
+      return './' + relative
+    }
+    return relative
   }
 
   var hmrManagerFilename;
