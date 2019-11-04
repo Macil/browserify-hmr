@@ -1,3 +1,7 @@
+## 0.4.1 (2019-11-04)
+
+* Fixed compatibility with the latest version of react-hot-loader. [#48](https://github.com/Macil/browserify-hmr/pull/48)
+
 ## 0.4.0 (2019-09-28)
 
 ### Breaking Changes
