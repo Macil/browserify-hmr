@@ -119,7 +119,7 @@ updates and applies them, so the application never gets a chance to call
 
 `u, url` is a string which sets the update URL that the websocket connection or
 Browserify bundle is accessible at. In "websocket" mode, this defaults to
-"http://localhost:3123". This is required for the "ajax" mode. This is not
+"//localhost:3123". This is required for the "ajax" mode. This is not
 required for "fs" mode.
 
 `p, port` is a number that sets the port to listen on if "websocket" mode is
